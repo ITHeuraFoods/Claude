@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+# Nunca subir credenciales ni tokens de sesión
+*.token
+*.secret
+.credentials.json
+*session*.json
+.env
