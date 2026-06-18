@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "heura": {
+      "source": {
+        "source": "github",
+        "repo": "ITHeuraFoods/Claude"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "heura-erp@heura": true
+  }
+}
