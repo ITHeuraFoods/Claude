@@ -21,6 +21,26 @@ Para actualizar cuando se publiquen cambios:
 /plugin update heura-erp@heura
 ```
 
+## Prerequisito de seguridad — Autenticación delegada por usuario
+
+> ⚠️ **OBLIGATORIO antes del despliegue org-wide.**
+
+El MCP Hub debe autenticar cada llamada a SAP y Odoo con la identidad real del usuario,
+no con una cuenta de servicio compartida. Sin esto, todos los usuarios de la IA verían
+los datos con los permisos de la cuenta de servicio, ignorando los roles SAP/Odoo de
+cada persona.
+
+Ver documentación técnica completa: [`docs/delegated-auth-architecture.md`](docs/delegated-auth-architecture.md)
+
+**Resumen de tareas (Basis + IT + Dev, ~3-4 semanas):**
+- Basis: configurar SAP IAS federado con Azure AD + activar OAuth 2.0 en SAP (`SOAUTH2`)
+- IT: registrar la aplicación en Azure AD con scopes Graph API
+- Dev: implementar Token Exchange (RFC 8693) en el backend del MCP Hub
+- IT: generar API keys Odoo por usuario y almacenarlas en Key Vault
+- Dev+Basis: testing con usuarios piloto de distintos perfiles
+
+---
+
 ## Despliegue a toda la organización (administrador)
 
 Para que el marketplace y el plugin se instalen automáticamente en todos los equipos sin
