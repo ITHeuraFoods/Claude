@@ -10,13 +10,10 @@ preguntas de negocio con datos reales, y generar dashboards HTML.
 
 ## Ubicación de los scripts
 
-En esta instalación los scripts están en:
-
-```
-C:\Users\EnaitzSemperena\.claude\skills\odoo-heura\scripts\
-```
-
-Ejecuta los comandos desde esa carpeta (`cd` a ella primero) o usa rutas absolutas.
+Los scripts están en la carpeta `scripts/` dentro del directorio de esta skill
+(el mismo directorio donde se encuentra este `SKILL.md`). Ejecuta los comandos
+desde ese directorio base o usa rutas absolutas a `scripts/odoo_connector.py`
+y `scripts/odoo_login.ps1`.
 
 ## Paso 0 — Comprobar sesión y autologin (SIEMPRE primero)
 

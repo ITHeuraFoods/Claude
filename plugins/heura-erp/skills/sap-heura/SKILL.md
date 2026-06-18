@@ -20,21 +20,17 @@ Estas reglas son de obligado cumplimiento en cada consulta:
 
 ## Ubicación de los scripts
 
-Los scripts están en la carpeta de esta skill. En esta instalación:
-
-```
-C:\Users\EnaitzSemperena\.claude\skills\sap-heura\scripts\
-```
-
-Ejecuta los comandos de abajo **desde esa carpeta** (haz `cd` a ella primero) o usa rutas
-absolutas a `scripts\sap_connector.py` y `scripts\sap_login.ps1`.
+Los scripts están en la carpeta `scripts/` dentro del directorio de esta skill
+(el mismo directorio donde se encuentra este `SKILL.md`). Ejecuta los comandos
+**desde ese directorio base** o usa rutas absolutas a `scripts/sap_connector.py`
+y `scripts/sap_login.ps1`.
 
 ## Paso 0 — Comprobar sesión y autologin (SIEMPRE primero)
 
 Antes de cualquier consulta, verifica que existe sesión activa (desde la carpeta de la skill):
 
 ```powershell
-cd "C:\Users\EnaitzSemperena\.claude\skills\sap-heura"
+# Desde el directorio raíz de la skill (donde está este SKILL.md):
 python scripts/sap_connector.py --test
 ```
 
