@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Marketplace interno de Heura Foods para plugins de Claude Code.",
-    "version": "1.1.0"
+    "version": "1.2.0"
   },
   "plugins": [
     {
       "name": "heura-erp",
       "source": "./plugins/heura-erp",
-      "description": "Consultas en lenguaje natural a los ERP de Heura (SAP S/4HANA y Odoo) y generación de dashboards."
+      "description": "Consultas en lenguaje natural a los ERP de Heura (SAP S/4HANA y Odoo) y generación de dashboards. Incluye context SAP S/4HANA Private Cloud y las normas de negocio internas."
     },
     {
       "name": "heura-brand",
