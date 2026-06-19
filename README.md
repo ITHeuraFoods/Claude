@@ -7,18 +7,19 @@ Marketplace interno de Heura Foods. Contiene los plugins de Claude Code que usa 
 | Plugin | Descripción |
 |--------|-------------|
 | `heura-erp` | Consultas en lenguaje natural a SAP S/4HANA y Odoo + dashboards. Incluye las normas de negocio internas. |
+| `heura-brand` | Directrices de marca para presentaciones y comunicaciones. Incluye `heura-brand-deck` para aplicar automáticamente el brand Heura 2026 a cualquier presentación. |
 
 ## Instalación (usuario individual)
 
 ```
 /plugin marketplace add ITHeuraFoods/Claude
-/plugin install heura-erp@heura
+/plugin install heura-erp@heura heura-brand@heura
 ```
 
 Para actualizar cuando se publiquen cambios:
 
 ```
-/plugin update heura-erp@heura
+/plugin update heura-erp@heura heura-brand@heura
 ```
 
 ## Prerequisito de seguridad — Autenticación delegada por usuario
@@ -43,7 +44,7 @@ Ver documentación técnica completa: [`docs/delegated-auth-architecture.md`](do
 
 ## Despliegue a toda la organización (administrador)
 
-Para que el marketplace y el plugin se instalen automáticamente en todos los equipos sin
+Para que el marketplace y los plugins se instalen automáticamente en todos los equipos sin
 acción del usuario, añade esto a los *managed settings* de la organización
 (en Windows: `C:\ProgramData\ClaudeCode\managed-settings.json`):
 
@@ -58,7 +59,8 @@ acción del usuario, añade esto a los *managed settings* de la organización
     }
   },
   "enabledPlugins": {
-    "heura-erp@heura": true
+    "heura-erp@heura": true,
+    "heura-brand@heura": true
   }
 }
 ```
@@ -66,11 +68,11 @@ acción del usuario, añade esto a los *managed settings* de la organización
 ## Cómo añadir o cambiar una norma de negocio
 
 Las normas de comportamiento viven dentro de cada skill, en su `SKILL.md`
-(p. ej. `plugins/heura-erp/skills/sap-heura/SKILL.md`, sección **Normas de negocio**).
+(p. ej. `plugins/heura-erp/skills/sap-heura/SKILL.md`, sección **Normas de negocio**;
+o `plugins/heura-brand/skills/heura-brand-deck/SKILL.md` para normas de marca).
 
 1. Edita el `SKILL.md` correspondiente.
-2. Sube la versión en `plugins/heura-erp/.claude-plugin/plugin.json` y en
-   `.claude-plugin/marketplace.json`.
+2. Sube la versión en el `plugin.json` de su plugin (p. ej. `plugins/heura-brand/.claude-plugin/plugin.json`).
 3. `git commit` + `git push`.
 
 Los usuarios reciben el cambio con `/plugin update` (o automáticamente si está desplegado
