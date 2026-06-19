@@ -1,7 +1,7 @@
 {
   "name": "heura-erp",
-  "version": "1.0.0",
-  "description": "Consultas en lenguaje natural a los ERP de Heura (SAP S/4HANA y Odoo) y generación de dashboards. Incluye las normas de negocio internas de Heura.",
+  "version": "1.1.0",
+  "description": "Consultas en lenguaje natural a los ERP de Heura (SAP S/4HANA y Odoo), acciones en Microsoft 365 (email, calendario, Teams, OneDrive) y generación de dashboards. Incluye las normas de negocio internas de Heura.",
   "author": {
     "name": "Heura Foods IT",
     "email": "it@heurafoods.com"
