@@ -5,13 +5,20 @@ activa el plugin `heura-erp` en todos los equipos, sin que el usuario tenga que 
 Los *managed settings* tienen prioridad sobre la configuración del usuario y no se pueden
 desactivar localmente.
 
+## Ficheros a desplegar
+
+| Fichero | Propósito |
+|---------|-----------|
+| `managed-settings.json` | Instala el marketplace y activa el plugin `heura-erp` |
+| `managed-mcp.json` | Registra los servidores MCP (SAP y M365) en todos los equipos |
+
 ## Ubicación destino por sistema operativo
 
 | SO | Ruta destino |
 |----|--------------|
-| Windows | `C:\ProgramData\ClaudeCode\managed-settings.json` |
-| macOS | `/Library/Application Support/ClaudeCode/managed-settings.json` |
-| Linux | `/etc/claude-code/managed-settings.json` |
+| Windows | `C:\ProgramData\ClaudeCode\` |
+| macOS | `/Library/Application Support/ClaudeCode/` |
+| Linux | `/etc/claude-code/` |
 
 ## Cómo desplegar
 
