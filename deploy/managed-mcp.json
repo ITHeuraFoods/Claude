@@ -1,10 +1,10 @@
 {
   "sap-heura-remote": {
     "type": "http",
-    "url": "http://172.6.2.2:3001/mcp"
+    "url": "http://100.69.51.16:3001/mcp"
   },
   "graph-heura-remote": {
     "type": "http",
-    "url": "http://172.6.2.2:3002/mcp"
+    "url": "http://100.69.51.16:3002/mcp"
   }
 }
