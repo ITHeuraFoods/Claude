@@ -8,6 +8,7 @@
     }
   },
   "enabledPlugins": {
-    "heura-erp@heura": true
+    "heura-erp@heura": true,
+    "heura-brand@heura": true
   }
 }
