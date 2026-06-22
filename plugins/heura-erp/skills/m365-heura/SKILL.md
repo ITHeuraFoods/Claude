@@ -1,6 +1,6 @@
 ---
 name: m365-heura
-description: Interactúa con Microsoft 365 de Heura en nombre del usuario. Úsala cuando el usuario quiera enviar emails, crear o consultar eventos de calendario, subir ficheros a OneDrive/SharePoint, o enviar mensajes en Teams. Requiere que el usuario haya completado el login M365 previamente.
+description: Interactúa con Microsoft 365 de Heura en nombre del usuario. Úsala cuando el usuario quiera enviar emails, crear o consultar eventos de calendario, subir ficheros a OneDrive/SharePoint, o enviar mensajes en Teams. Gestiona el login M365 automáticamente si no hay sesión activa.
 ---
 
 # M365 Heura — Email, Calendario, OneDrive y Teams
@@ -15,17 +15,24 @@ con la identidad real del usuario (OAuth 2.0 delegado).
 - **NUNCA escribas en un fichero de OneDrive sin confirmación.**
 - Si el usuario no ha especificado su email M365, pregúntalo antes de continuar.
 
-## Paso 0 — Identificar al usuario
+## Paso 0 — Identificar al usuario y verificar sesión M365
 
 Antes de cualquier acción necesitas el email M365 del usuario (ej: `ana@heurafoods.com`).
 Si no lo has mencionado en esta sesión, pregúntalo.
 
-Si el MCP devuelve un error de sesión ("No hay sesión M365"), el usuario debe ejecutar
-en el laptop de oficina:
+### Login automático si no hay sesión
+
+Si el MCP devuelve un error que contiene "No hay sesión M365" o "sesión M365 activa":
+
+1. Informa al usuario: "No tienes sesión M365 activa. Voy a abrir el login ahora."
+2. Ejecuta via Bash:
 ```powershell
-cd C:\heura-mcp
-python graph_login.py
+$env:HEURA_REGISTER_SECRET = "Heura2026!"; python "$env:USERPROFILE\.claude\heura-m365\graph_login_remote.py"
 ```
+3. Espera a que el proceso termine (el usuario hará login en el navegador que se abre).
+4. Cuando el script imprima "Listo. Sesión M365 registrada", reintenta la acción original automáticamente.
+
+Si el script no existe en esa ruta, indica al usuario que ejecute el script de Intune para instalarlo.
 
 ## Herramientas disponibles (vía MCP graph-heura-remote)
 
