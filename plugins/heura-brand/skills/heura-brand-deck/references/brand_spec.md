@@ -61,27 +61,33 @@ Use **one of these three universes per slide**:
 
 ### Font Stack
 
-| Purpose | Primary Font | Weight | Secondary Font | Usage Notes |
-|---------|--------------|--------|-----------------|------------|
-| **Display** | Veneer | Regular | Poppins Black | UPPERCASE ONLY. For major headlines, huge impact. Rarely used—reserve for opening/closing/critical moments. |
-| **Punchy Headlines** | Druk / Druk Wide | Bold | Poppins Bold | Short, impactful statements. "Say it loud." Max 2-3 lines. |
-| **Titles & Headers** | Poppins | Semibold, Bold | Druk | Section headers, slide titles, prominent calls-out. |
-| **Body Copy** | Poppins | Medium, Semibold | — | Paragraph text, bullet points, explanations. Maximum readability. |
-| **Editorial Alternative** | Reckless Condensed | — | Poppins | Used sparingly for stylistic variation. Not for body copy. |
+| Purpose | Primary Font | Weight | Source | Usage Notes |
+|---------|--------------|--------|--------|------------|
+| **Brand Headings** | Heura | Regular | Custom (`Heura.woff`) — heurafoods.com | Primary heading font used across the website (h1–h3). The official digital brand typeface. |
+| **Display / Impact** | Veneer | Regular | Licensed | UPPERCASE ONLY. For major impact moments — opening slides, closing, key statements. |
+| **Punchy Headlines** | Druk / Druk Wide | Bold | Licensed | Short, bold statements. "Say it loud." Max 2-3 lines. |
+| **Titles & Headers** | Poppins | Semibold, Bold | Google Fonts (free) | Section headers, slide titles, prominent call-outs. Workhorse font. |
+| **Body Copy** | Poppins | Medium, Semibold | Google Fonts (free) | Paragraph text, bullet points, explanations. Maximum readability. |
+| **Editorial Alternative** | Reckless Condensed | — | Licensed | Used sparingly for stylistic variation. Not for body copy. |
+| **Decorative / Special** | Pixel Grafiti | Regular | Custom (`Pixel-Grafiti.woff`) — heurafoods.com | Pixel-style display font for decorative use only. Never for body text or key messages. |
 
 ### Font Licensing & Fallbacks
 
+- **Heura**: Custom brand font from heurafoods.com — download from the brand assets repo or `/fonts/heura/Heura.woff`.
+- **Pixel Grafiti**: Custom decorative font from heurafoods.com — `/fonts/pixel/Pixel-Grafiti.woff`.
 - **Veneer, Druk, Druk Wide, Reckless Condensed**: Licensed fonts — install before building decks.
-- **Fallback**: If licensed fonts unavailable, use **Poppins** (Google Fonts, freely available) for all text.
-- **Implementation**: Code should gracefully degrade if fonts aren't installed.
+- **Poppins**: Google Fonts, freely available — fallback for all unlicensed contexts.
+- **Fallback hierarchy**: Heura → Veneer/Druk → Poppins. If brand fonts unavailable, use **Poppins** everywhere.
 
 ### Typography Rules
 
-1. **Max 3 typefaces per slide**. Typical: 1 headline font + Poppins for body = 2. Occasionally 3 if using Reckless Condensed for a block.
+1. **Max 3 typefaces per slide**. Typical: Heura or Druk for headline + Poppins for body = 2. Occasionally 3 if adding Veneer or Reckless Condensed.
 2. **Veneer is UPPERCASE ONLY.** Never mixed case, never lowercase.
-3. **Hierarchy**: Large headline (24pt+) → body copy (12-14pt). Contrast them visually.
-4. **Line spacing**: 1.2x for headlines, 1.5x for body copy (readability).
-5. **Contrast**: Text must be legible against background. Use white on dark, black on light.
+3. **Heura is the primary digital heading font** — matches the heurafoods.com website; use it to maintain brand consistency in digital-first presentations.
+4. **Pixel Grafiti is decorative only** — never use for slide titles, body copy, or any content that needs to be legible at small sizes.
+5. **Hierarchy**: Large headline (24pt+) → body copy (12-14pt). Contrast them visually.
+6. **Line spacing**: 1.2x for headlines, 1.5x for body copy (readability).
+7. **Contrast**: Text must be legible against background. Use white on dark, black on light.
 
 ---
 
