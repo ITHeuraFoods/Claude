@@ -376,6 +376,35 @@ Before finalizing any deck, verify:
 
 ---
 
+## Logo Assets
+
+Logo files are bundled in the skill's `assets/` folder (downloaded from the Heura Brand Kit in SharePoint):
+
+```python
+import os
+
+# Get the skill base directory (passed by Claude Code when invoking the skill)
+# skill_base_dir is available as a variable in the skill execution context
+assets = os.path.join(skill_base_dir, "assets")
+
+LOGOS = {
+    'black':  os.path.join(assets, "logo-black.png"),   # Black logo, transparent background
+    'white':  os.path.join(assets, "logo-white.png"),   # White logo, transparent background
+}
+
+# Usage in python-pptx:
+# slide.shapes.add_picture(LOGOS['black'], left, top, width=Inches(1.5))
+```
+
+**Logo placement rules:**
+- Title slide: bottom-right corner, `Inches(1.5)` wide
+- Closing slide: bottom-right corner
+- Content slides: optional, smaller (`Inches(1.0)`)
+- Always on yellow, black, or white background — never on tertiary colors
+- Never apply shadows, effects, or distortions
+
+---
+
 ## Notes
 
 - **Font Installation**: Before running the script, ensure Veneer, Druk, and Reckless Condensed are installed. Otherwise, python-pptx will silently substitute system defaults.
