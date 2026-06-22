@@ -13,7 +13,7 @@ AUTHORITY  = f"https://login.microsoftonline.com/{TENANT_ID}"
 SCOPES     = ["Mail.Send", "Mail.ReadWrite", "Calendars.ReadWrite",
               "Files.ReadWrite.All", "Chat.ReadWrite", "ChannelMessage.Send"]
 
-SERVER_URL = os.environ.get("HEURA_MCP_URL", "http://laptop-itadm:3002")
+SERVER_URL = os.environ.get("HEURA_MCP_URL", "http://laptop-itadm:3003")
 SECRET     = os.environ.get("HEURA_REGISTER_SECRET", "")
 
 if not SECRET:
