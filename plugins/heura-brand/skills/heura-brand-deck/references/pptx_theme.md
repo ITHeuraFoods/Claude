@@ -376,25 +376,61 @@ Before finalizing any deck, verify:
 
 ---
 
-## Logo Assets
+## Brand Assets
 
-Logo files are bundled in the skill's `assets/` folder (downloaded from the Heura Brand Kit in SharePoint):
+All brand assets are bundled in the skill's `assets/` folder (sourced from the Heura Brand Kit in SharePoint):
 
 ```python
 import os
+import glob
 
-# Get the skill base directory (passed by Claude Code when invoking the skill)
-# skill_base_dir is available as a variable in the skill execution context
 assets = os.path.join(skill_base_dir, "assets")
 
+# Logos
 LOGOS = {
-    'black':  os.path.join(assets, "logo-black.png"),   # Black logo, transparent background
-    'white':  os.path.join(assets, "logo-white.png"),   # White logo, transparent background
+    'black': os.path.join(assets, "logo-black.png"),   # Black logo, transparent bg
+    'white': os.path.join(assets, "logo-white.png"),   # White logo, transparent bg
 }
 
-# Usage in python-pptx:
-# slide.shapes.add_picture(LOGOS['black'], left, top, width=Inches(1.5))
+# Ripped paper overlays (2025 — signature Heura brand element)
+# Variants: yellow (x3), black (x4), white (x3)
+RIPPED_PAPERS = {
+    'yellow': sorted(glob.glob(os.path.join(assets, "ripped-papers", "*yellow*.png"))),
+    'black':  sorted(glob.glob(os.path.join(assets, "ripped-papers", "*black*.png"))),
+    'white':  sorted(glob.glob(os.path.join(assets, "ripped-papers", "*white*.png"))),
+}
+
+# Icons (14 generic brand icons)
+# IC-Plant, IC-Earth, IC-Muscle, IC-CO2, IC-Cow, IC-Protein, IC-Apple,
+# IC-Water, IC-Megaphone, IC-Target, IC-Collabs, IC-Telescope, IC-Cheese, IC-Music
+ICONS = {os.path.splitext(os.path.basename(p))[0]: p
+         for p in glob.glob(os.path.join(assets, "icons", "IC-*.png"))}
+
+# Spray elements (decorative — white spray-paint style)
+SPRAY = {
+    'arrow1':     os.path.join(assets, "spray", "SPRAY-Arrow1-WHITE.png"),
+    'arrow2':     os.path.join(assets, "spray", "SPRAY-Arrow2-WHITE.png"),
+    'good_rebels': os.path.join(assets, "spray", "SPRAY-GoodRebels (1).png"),
+}
 ```
+
+**Usage in python-pptx:**
+```python
+# Logo — always bottom-right corner
+slide.shapes.add_picture(LOGOS['black'], Inches(8.1), Inches(6.5), width=Inches(1.6))
+
+# Ripped paper — full-width overlay at bottom of slide (creates torn-paper transition effect)
+slide.shapes.add_picture(RIPPED_PAPERS['yellow'][0], Inches(0), Inches(5.5), width=Inches(10))
+
+# Icon — use in content slides to illustrate a concept
+slide.shapes.add_picture(ICONS['IC-Plant'], Inches(0.5), Inches(2), width=Inches(1.2))
+```
+
+**Ripped paper placement rules:**
+- Use at slide borders (top or bottom edge), full-width (`Inches(10)`)
+- Match paper color to slide background: yellow paper on yellow bg, black on black, white on white
+- Always place BEHIND text (add picture before text shapes)
+- Signature Heura element — use on at least one slide per deck
 
 **Logo placement rules:**
 - Title slide: bottom-right corner, `Inches(1.5)` wide
