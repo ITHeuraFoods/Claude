@@ -11,6 +11,13 @@ desactivar localmente.
 |---------|-----------|
 | `managed-settings.json` | Instala el marketplace y activa el plugin `heura-erp` |
 | `managed-mcp.json` | Registra los servidores MCP (SAP y M365) en todos los equipos |
+| `install-fonts.ps1` | Instala las fuentes corporativas Heura y Pixel Grafiti |
+| `fonts/Heura.ttf` | Fuente custom brand (headings) — **añadir manualmente** |
+| `fonts/Pixel-Grafiti.ttf` | Fuente decorativa custom — **añadir manualmente** |
+
+> **Antes de desplegar las fuentes**: pide los archivos `.ttf` al equipo de diseño.
+> Los `.woff` de heurafoods.com no son instalables como fuentes de sistema en Windows.
+> Colócalos en `deploy/fonts/` y haz push al repo.
 
 ## Ubicación destino por sistema operativo
 
