@@ -46,18 +46,16 @@ This skill makes every deck **on-brand for Heura** (purpose-made plant-based foo
 
 | Usage | Font | Weight | Notes |
 |-------|------|--------|-------|
-| Brand headings (digital) | **Heura** | Regular | Custom font from heurafoods.com. Used for all h1–h3 on the website. Primary heading font for digital-first decks. |
 | Display/Large titles | Veneer | — | UPPERCASE ONLY. Impact moments. |
 | Punchy headlines | Druk / Druk Wide | — | Short, bold statements |
-| Headlines & body | Poppins | Medium, Semibold, Bold, Black | Workhorse font (Google Fonts, free) |
+| Headlines & body | Poppins | Medium, Semibold, Bold, Black | Workhorse font (Google Fonts, free) ✅ |
 | Editorial alternative | Reckless Condensed | — | Sparingly, not for body copy |
-| Decorative / special | Pixel Grafiti | — | Custom pixel font from heurafoods.com. Decorative use only. |
+
+> ⚠️ **"Heura" custom font**: used on heurafoods.com (web only, `.woff`). The brand team has marked it **DO NOT USE** for presentations and documents — the `.ttf` was removed from the Brand Kit in August 2025. Use **Poppins** instead.
 
 **Constraints:**
 - Max 3 typefaces per slide
-- **Heura** is the primary digital heading font — prefer it for presentations shared digitally to match the website
-- Fallback hierarchy: Heura → Veneer/Druk → Poppins
-- If brand fonts aren't installed, default to **Poppins** everywhere
+- Fallback: If brand fonts aren't installed, default to **Poppins** everywhere
 - Licensed font status: Check `references/pptx_theme.md` for fallback rules
 
 ### Tone & aesthetics

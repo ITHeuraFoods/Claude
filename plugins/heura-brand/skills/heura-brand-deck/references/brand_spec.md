@@ -63,31 +63,30 @@ Use **one of these three universes per slide**:
 
 | Purpose | Primary Font | Weight | Source | Usage Notes |
 |---------|--------------|--------|--------|------------|
-| **Brand Headings** | Heura | Regular | Custom (`Heura.woff`) — heurafoods.com | Primary heading font used across the website (h1–h3). The official digital brand typeface. |
 | **Display / Impact** | Veneer | Regular | Licensed | UPPERCASE ONLY. For major impact moments — opening slides, closing, key statements. |
 | **Punchy Headlines** | Druk / Druk Wide | Bold | Licensed | Short, bold statements. "Say it loud." Max 2-3 lines. |
-| **Titles & Headers** | Poppins | Semibold, Bold | Google Fonts (free) | Section headers, slide titles, prominent call-outs. Workhorse font. |
-| **Body Copy** | Poppins | Medium, Semibold | Google Fonts (free) | Paragraph text, bullet points, explanations. Maximum readability. |
+| **Titles & Headers** | Poppins | Semibold, Bold | Google Fonts (free) ✅ | Section headers, slide titles, prominent call-outs. Workhorse font. |
+| **Body Copy** | Poppins | Medium, Semibold | Google Fonts (free) ✅ | Paragraph text, bullet points, explanations. Maximum readability. |
 | **Editorial Alternative** | Reckless Condensed | — | Licensed | Used sparingly for stylistic variation. Not for body copy. |
-| **Decorative / Special** | Pixel Grafiti | Regular | Custom (`Pixel-Grafiti.woff`) — heurafoods.com | Pixel-style display font for decorative use only. Never for body text or key messages. |
+
+> ⚠️ **"Heura" font (web only — DO NOT USE in presentations)**: The brand team explicitly removed the `.ttf` from the Brand Kit (August 2025) and marked the folder "DO NOT USE THIS FONT- Heura". The font exists only as `.woff` on heurafoods.com for web rendering. **Do not use it in slides or documents.** Use Poppins as the heading/body fallback.
+>
+> ⚠️ **"Pixel Grafiti" (web only)**: Custom decorative font used on heurafoods.com, only available as `.woff`. Not in the Brand Kit. Do not use in presentations.
 
 ### Font Licensing & Fallbacks
 
-- **Heura**: Custom brand font from heurafoods.com — download from the brand assets repo or `/fonts/heura/Heura.woff`.
-- **Pixel Grafiti**: Custom decorative font from heurafoods.com — `/fonts/pixel/Pixel-Grafiti.woff`.
-- **Veneer, Druk, Druk Wide, Reckless Condensed**: Licensed fonts — install before building decks.
-- **Poppins**: Google Fonts, freely available — fallback for all unlicensed contexts.
-- **Fallback hierarchy**: Heura → Veneer/Druk → Poppins. If brand fonts unavailable, use **Poppins** everywhere.
+- **Poppins**: Google Fonts, freely available. `.ttf` files in the Brand Kit (`00.3 Heura® Typefonts/Poppins/`). ✅
+- **Veneer**: Licensed — folder in Brand Kit but files not currently uploaded. Purchase separately.
+- **Druk, Druk Wide, Reckless Condensed**: Licensed fonts — purchase and install separately.
+- **Fallback**: If licensed fonts unavailable, use **Poppins** for everything.
 
 ### Typography Rules
 
-1. **Max 3 typefaces per slide**. Typical: Heura or Druk for headline + Poppins for body = 2. Occasionally 3 if adding Veneer or Reckless Condensed.
+1. **Max 3 typefaces per slide**. Typical: Veneer or Druk for headline + Poppins for body = 2.
 2. **Veneer is UPPERCASE ONLY.** Never mixed case, never lowercase.
-3. **Heura is the primary digital heading font** — matches the heurafoods.com website; use it to maintain brand consistency in digital-first presentations.
-4. **Pixel Grafiti is decorative only** — never use for slide titles, body copy, or any content that needs to be legible at small sizes.
-5. **Hierarchy**: Large headline (24pt+) → body copy (12-14pt). Contrast them visually.
-6. **Line spacing**: 1.2x for headlines, 1.5x for body copy (readability).
-7. **Contrast**: Text must be legible against background. Use white on dark, black on light.
+3. **Hierarchy**: Large headline (24pt+) → body copy (12-14pt). Contrast them visually.
+4. **Line spacing**: 1.2x for headlines, 1.5x for body copy (readability).
+5. **Contrast**: Text must be legible against background. Use white on dark, black on light.
 
 ---
 
