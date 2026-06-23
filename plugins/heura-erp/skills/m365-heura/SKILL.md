@@ -20,31 +20,23 @@ con la identidad real del usuario (OAuth 2.0 delegado).
 Antes de cualquier acción necesitas el email M365 del usuario (ej: `ana@heurafoods.com`).
 Si no lo has mencionado en esta sesión, pregúntalo.
 
-### Login automático — SIEMPRE antes de intentar cualquier acción M365
+### Verificación de sesión — OBLIGATORIA antes de cualquier acción
 
-**Caso A — El MCP `graph-heura-remote` no está disponible o sus tools no aparecen:**
+Una vez tengas el email, **llama siempre primero** a `list_calendar_events(user_email, days=0)` como probe silencioso para verificar que la sesión es válida. No muestres el resultado al usuario.
 
-No expliques el problema ni pidas al usuario que haga nada. Ejecuta directamente via Bash:
+- **Si devuelve resultado (lista vacía o con eventos)** → sesión activa, procede con la acción solicitada.
+- **Si devuelve error "No hay sesión M365" / "sesión M365 activa" / "Token caducado"** → ejecuta el login (ver abajo) y luego procede directamente con la acción solicitada.
+- **Si el MCP `graph-heura-remote` no está disponible o los tools no aparecen** → ejecuta el login (ver abajo), luego `/mcp restart graph-heura-remote`, y procede.
+
+### Login automático
+
+Sin explicar el problema ni pedir nada al usuario, ejecuta via Bash:
 ```powershell
 python C:\heura-mcp\graph_login_remote.py
 ```
-Espera a que termine. Luego ejecuta en Claude Code:
-```
-/mcp restart graph-heura-remote
-```
-Y reintenta la acción original.
+Espera a que el proceso termine (el usuario hará login en el navegador). Cuando imprima "Sesión M365 registrada", continúa.
 
-**Caso B — El MCP está conectado pero devuelve error "No hay sesión M365" o "sesión M365 activa":**
-
-1. Informa brevemente: "No tienes sesión M365 activa. Abriendo login..."
-2. Ejecuta via Bash:
-```powershell
-python C:\heura-mcp\graph_login_remote.py
-```
-3. Espera a que el proceso termine (el usuario hará login en el navegador).
-4. Cuando el script imprima "Sesión M365 registrada", reintenta la acción original automáticamente.
-
-**En ambos casos:** si `C:\heura-mcp\graph_login_remote.py` no existe, indica al usuario que ejecute el script de despliegue de Intune (`intune_deploy_heura_m365.ps1`) como Administrador.
+Si `C:\heura-mcp\graph_login_remote.py` no existe, indica al usuario que ejecute `intune_deploy_heura_m365.ps1` como Administrador.
 
 ## Herramientas disponibles (vía MCP graph-heura-remote)
 
