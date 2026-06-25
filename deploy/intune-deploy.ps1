@@ -13,7 +13,7 @@ Invoke-WebRequest "$base/deploy/managed-mcp.json"       -OutFile "C:\ProgramData
 
 # Fuentes corporativas Heura
 $fontScript = "C:\ProgramData\ClaudeCode\install-fonts.ps1"
-Invoke-WebRequest "$base/install-fonts.ps1" -OutFile $fontScript -UseBasicParsing
+Invoke-WebRequest "$base/deploy/install-fonts.ps1" -OutFile $fontScript -UseBasicParsing
 PowerShell.exe -ExecutionPolicy Bypass -File $fontScript
 
 # ── 2. Registrar servidores MCP en Claude Desktop ────────────────────────────
