@@ -28,12 +28,13 @@ Write-Host '   Introduce tus credenciales SAP. Tu contrasena se' -ForegroundColo
 Write-Host '   enmascara y NO se guarda en disco ni en el chat.' -ForegroundColor Gray
 Write-Host ''
 
-# Diálogo nativo seguro de Windows (usuario + contraseña enmascarada)
-$cred = Get-Credential -Message 'Credenciales SAP S/4HANA (mandante 100)'
-if (-not $cred) { Write-Host 'Cancelado.' -ForegroundColor Yellow; Start-Sleep 2; exit 1 }
-
-$user = $cred.UserName
-$pass = $cred.GetNetworkCredential().Password
+# Pedir credenciales en la misma ventana PowerShell (funciona en todos los entornos)
+$user = Read-Host 'Usuario SAP'
+$secPass = Read-Host 'Contraseña SAP' -AsSecureString
+$pass = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+    [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secPass)
+)
+if (-not $user -or -not $pass) { Write-Host 'Cancelado.' -ForegroundColor Yellow; Start-Sleep 2; exit 1 }
 
 Write-Host "Validando como $user contra SAP..." -ForegroundColor Gray
 

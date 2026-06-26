@@ -20,18 +20,25 @@ Estas reglas son de obligado cumplimiento en cada consulta:
 
 ## Ubicación de los scripts
 
-Los scripts están en la carpeta `scripts/` dentro del directorio de esta skill
-(el mismo directorio donde se encuentra este `SKILL.md`). Ejecuta los comandos
-**desde ese directorio base** o usa rutas absolutas a `scripts/sap_connector.py`
-y `scripts/sap_login.ps1`.
+Los scripts están en la carpeta de esta skill. La ruta base se indica en la cabecera
+"Base directory for this skill:" que aparece al cargar la skill. Úsala como variable
+`$SKILL_DIR` en todos los comandos. Ejemplo:
+
+```
+$SKILL_DIR = <base directory indicado en la cabecera>
+```
+
+Ejecuta SIEMPRE con rutas absolutas a `$SKILL_DIR\scripts\sap_connector.py` y
+`$SKILL_DIR\scripts\sap_login.ps1`. Nunca uses rutas relativas ni hardcodees un
+nombre de usuario de Windows.
 
 ## Paso 0 — Comprobar sesión y autologin (SIEMPRE primero)
 
-Antes de cualquier consulta, verifica que existe sesión activa (desde la carpeta de la skill):
+Antes de cualquier consulta, verifica que existe sesión activa. Usa la ruta base
+de la skill (`$SKILL_DIR`) obtenida de la cabecera:
 
 ```powershell
-# Desde el directorio raíz de la skill (donde está este SKILL.md):
-python scripts/sap_connector.py --test
+python "$SKILL_DIR\scripts\sap_connector.py" --test
 ```
 
 Interpreta el resultado:
@@ -40,22 +47,22 @@ Interpreta el resultado:
 
 - Si responde "Conexión OK" → continúa al Paso 1.
 - Si da error de credenciales/token → **lanza automáticamente la ventana de login segura**
-  (no pidas la contraseña por el chat). En Windows:
+  (no pidas la contraseña por el chat). En Windows, usa SIEMPRE la ruta absoluta:
 
   ```powershell
-  Start-Process pwsh -ArgumentList '-NoProfile','-File','scripts/sap_login.ps1' -Wait
+  Start-Process pwsh -ArgumentList '-NoProfile','-File',"$SKILL_DIR\scripts\sap_login.ps1" -Wait
   ```
 
-  Si `pwsh` no existe, usa `powershell` en su lugar. Esto abre una ventana aparte con un
-  diálogo seguro de Windows donde el usuario teclea usuario y contraseña SAP (enmascarada).
+  Si `pwsh` no existe, usa `powershell` en su lugar. Esto abre una ventana aparte donde
+  el usuario teclea usuario y contraseña SAP (enmascarada en la terminal, sin popup GUI).
   Solo se guarda el token de sesión temporal; la contraseña nunca se persiste ni te llega.
 
-- Tras `-Wait`, vuelve a ejecutar `python scripts/sap_connector.py --test` para confirmar.
-  Si sigue fallando, pídele al usuario que repita el login (pudo cancelar el diálogo).
+- Tras `-Wait`, vuelve a ejecutar `python "$SKILL_DIR\scripts\sap_connector.py" --test` para confirmar.
+  Si sigue fallando, pídele al usuario que repita el login (pudo cancelar la ventana).
 
 REGLA DE SEGURIDAD: NUNCA pidas ni aceptes la contraseña SAP escrita en el chat. El único
-canal de credenciales es la ventana de `sap_login.ps1`. (Alternativa manual en terminal del
-usuario: `python scripts/sap_login.py`.)
+canal de credenciales es la ventana de `sap_login.ps1`. Si el usuario prefiere hacerlo
+manualmente desde su propio terminal: `python "$SKILL_DIR\scripts\sap_login.py"`
 
 ## Paso 1 — Entender qué datos hacen falta
 
