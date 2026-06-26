@@ -30,10 +30,12 @@ Una vez tengas el email, **llama siempre primero** a `list_calendar_events(user_
 
 ### Login automático
 
-Sin explicar el problema ni pedir nada al usuario, ejecuta via Bash:
+Sin explicar el problema ni pedir nada al usuario, ejecuta via Bash usando la ruta absoluta de Python (evita el secuestro del alias de la Microsoft Store):
 ```powershell
-python C:\heura-mcp\graph_login_remote.py
+& "C:\Program Files\Python312\python.exe" C:\heura-mcp\graph_login_remote.py
 ```
+Si esa ruta no existe, prueba con `python C:\heura-mcp\graph_login_remote.py` como fallback.
+
 Espera a que el proceso termine (el usuario hará login en el navegador). Cuando imprima "Sesión M365 registrada", continúa.
 
 Si `C:\heura-mcp\graph_login_remote.py` no existe, indica al usuario que ejecute `intune_deploy_heura_m365.ps1` como Administrador.
