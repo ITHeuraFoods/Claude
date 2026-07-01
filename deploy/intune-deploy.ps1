@@ -44,13 +44,16 @@ $config | ConvertTo-Json -Depth 10 | Set-Content $configFile -Encoding UTF8
 New-Item -ItemType Directory -Force $loginDir | Out-Null
 Invoke-WebRequest "$base/scripts/graph_login_remote.py" -OutFile "$loginDir\graph_login_remote.py" -UseBasicParsing
 
-# Acceso directo en el escritorio
-$shortcut = "$env:USERPROFILE\Desktop\Conectar M365 con Claude.lnk"
-$wsh = New-Object -ComObject WScript.Shell
-$lnk = $wsh.CreateShortcut($shortcut)
-$lnk.TargetPath       = "powershell.exe"
-$lnk.Arguments        = "-ExecutionPolicy Bypass -Command `"& { `$env:HEURA_REGISTER_SECRET='Heura2026!'; python '$loginDir\graph_login_remote.py' }; pause`""
-$lnk.WorkingDirectory = $loginDir
-$lnk.IconLocation     = "shell32.dll,144"
-$lnk.Description      = "Conectar cuenta M365 con Claude"
-$lnk.Save()
+# Acceso directo en el escritorio (solo si hay usuario interactivo)
+$desktopPath = [Environment]::GetFolderPath("Desktop")
+if ($desktopPath -and (Test-Path $desktopPath)) {
+    $shortcut = "$desktopPath\Conectar M365 con Claude.lnk"
+    $wsh = New-Object -ComObject WScript.Shell
+    $lnk = $wsh.CreateShortcut($shortcut)
+    $lnk.TargetPath       = "powershell.exe"
+    $lnk.Arguments        = "-ExecutionPolicy Bypass -Command `"& { `$env:HEURA_REGISTER_SECRET='Heura2026!'; python '$loginDir\graph_login_remote.py' }; pause`""
+    $lnk.WorkingDirectory = $loginDir
+    $lnk.IconLocation     = "shell32.dll,144"
+    $lnk.Description      = "Conectar cuenta M365 con Claude"
+    $lnk.Save()
+}
