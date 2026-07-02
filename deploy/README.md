@@ -23,15 +23,18 @@ desactivar localmente.
 
 | SO | Ruta destino |
 |----|--------------|
-| Windows | `C:\ProgramData\ClaudeCode\` |
+| Windows | `C:\Program Files\ClaudeCode\` |
 | macOS | `/Library/Application Support/ClaudeCode/` |
 | Linux | `/etc/claude-code/` |
 
+> En Windows, la ruta legacy `C:\ProgramData\ClaudeCode\` ya no está soportada desde Claude Code v2.1.75.
+
 ## Cómo desplegar
 
-- **Windows (Intune / GPO):** repartir el fichero a `C:\ProgramData\ClaudeCode\`. Crear la
-  carpeta si no existe. Requiere permisos de administrador local (lo aplica la política, no
-  el usuario).
+- **Windows (Intune):** usar `intune-deploy-system.ps1` (contexto SYSTEM, "Run as logged on
+  user = No") para `managed-settings.json`/`managed-mcp.json`/fuentes, e
+  `intune-deploy-user.ps1` (contexto de usuario) para el login M365. Program Files requiere
+  permisos de administrador, por eso van en scripts separados con distinto contexto.
 - **macOS (Jamf / MDM):** desplegar a `/Library/Application Support/ClaudeCode/`.
 - **Linux (Ansible / script):** copiar a `/etc/claude-code/`.
 
