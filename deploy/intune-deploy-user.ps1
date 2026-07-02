@@ -11,11 +11,14 @@ param(
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$base     = "https://raw.githubusercontent.com/ITHeuraFoods/Claude/main"
-$loginDir = "$env:USERPROFILE\.claude\heura-m365"
+# El script en sí (C:\heura-mcp\graph_login_remote.py) lo despliega intune-deploy-system.ps1,
+# ruta fija de máquina que también usa la skill m365-heura para su login automático.
+$loginScript = "C:\heura-mcp\graph_login_remote.py"
 
-New-Item -ItemType Directory -Force $loginDir | Out-Null
-Invoke-WebRequest "$base/scripts/graph_login_remote.py" -OutFile "$loginDir\graph_login_remote.py" -UseBasicParsing
+# Misma ruta absoluta de Python que usa la skill, para evitar el alias-stub de la Microsoft
+# Store; si no existe en esta máquina, cae a "python" del PATH.
+$pythonAbs = "C:\Program Files\Python312\python.exe"
+$pythonCmd = if (Test-Path $pythonAbs) { "& '$pythonAbs'" } else { "python" }
 
 # Acceso directo en el escritorio
 $desktopPath = [Environment]::GetFolderPath("Desktop")
@@ -24,8 +27,8 @@ if ($desktopPath -and (Test-Path $desktopPath)) {
     $wsh = New-Object -ComObject WScript.Shell
     $lnk = $wsh.CreateShortcut($shortcut)
     $lnk.TargetPath       = "powershell.exe"
-    $lnk.Arguments        = "-ExecutionPolicy Bypass -Command `"& { `$env:HEURA_REGISTER_SECRET='$RegisterSecret'; python '$loginDir\graph_login_remote.py' }; pause`""
-    $lnk.WorkingDirectory = $loginDir
+    $lnk.Arguments        = "-ExecutionPolicy Bypass -Command `"& { `$env:HEURA_REGISTER_SECRET='$RegisterSecret'; $pythonCmd '$loginScript' }; pause`""
+    $lnk.WorkingDirectory = "C:\heura-mcp"
     $lnk.IconLocation     = "shell32.dll,144"
     $lnk.Description      = "Conectar cuenta M365 con Claude"
     $lnk.Save()

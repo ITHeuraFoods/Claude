@@ -20,3 +20,9 @@ Invoke-WebRequest "$base/deploy/managed-mcp.json"       -OutFile "$dest\managed-
 $fontScript = "$dest\install-fonts.ps1"
 Invoke-WebRequest "$base/deploy/install-fonts.ps1" -OutFile $fontScript -UseBasicParsing
 PowerShell.exe -ExecutionPolicy Bypass -File $fontScript
+
+# Script de login M365 remoto — ruta fija de máquina, la misma que espera la skill m365-heura
+# (ver "Login automático" en el SKILL.md del plugin heura-erp). Va aquí, no en el script de
+# usuario, porque C:\heura-mcp requiere permisos de administrador para crearse.
+New-Item -ItemType Directory -Force "C:\heura-mcp" | Out-Null
+Invoke-WebRequest "$base/scripts/graph_login_remote.py" -OutFile "C:\heura-mcp\graph_login_remote.py" -UseBasicParsing
