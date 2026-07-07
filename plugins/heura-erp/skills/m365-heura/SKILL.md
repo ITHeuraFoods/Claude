@@ -38,7 +38,7 @@ Si esa ruta no existe, prueba con `python C:\heura-mcp\graph_login_remote.py` co
 
 Espera a que el proceso termine (el usuario hará login en el navegador). Cuando imprima "Sesión M365 registrada", continúa.
 
-Si `C:\heura-mcp\graph_login_remote.py` no existe, indica al usuario que ejecute `intune_deploy_heura_m365.ps1` como Administrador.
+Si `C:\heura-mcp\graph_login_remote.py` no existe, el despliegue de Intune (`intune-deploy-system.ps1`) aún no ha llegado a este equipo: indica al usuario que contacte con IT (it@heurafoods.com).
 
 ## Herramientas disponibles (vía MCP graph-heura-remote)
 

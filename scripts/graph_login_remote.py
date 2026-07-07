@@ -13,7 +13,10 @@ AUTHORITY  = f"https://login.microsoftonline.com/{TENANT_ID}"
 SCOPES     = ["Mail.Send", "Mail.ReadWrite", "Calendars.ReadWrite",
               "Files.ReadWrite.All", "Chat.ReadWrite", "ChannelMessage.Send"]
 
-SERVER_URL = os.environ.get("HEURA_MCP_URL", "http://laptop-itadm:3003")
+# IP fija del hub MCP (laptop-itadm): el hostname solo resuelve vía Tailscale MagicDNS,
+# que los laptops de empleados no tienen. La IP funciona en LAN y por SSL-VPN Fortinet
+# (ver docs/fortinet-vpn-mcp-access.md).
+SERVER_URL = os.environ.get("HEURA_MCP_URL", "http://172.6.2.2:3003")
 SECRET     = os.environ.get("HEURA_REGISTER_SECRET", "")
 
 if not SECRET:

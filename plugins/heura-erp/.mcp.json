@@ -2,11 +2,11 @@
   "mcpServers": {
     "sap-heura-remote": {
       "type": "http",
-      "url": "http://laptop-itadm:3001/mcp"
+      "url": "http://172.6.2.2:3001/mcp"
     },
     "graph-heura-remote": {
       "type": "http",
-      "url": "http://laptop-itadm:3002/mcp"
+      "url": "http://172.6.2.2:3002/mcp"
     }
   }
 }
