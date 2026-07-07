@@ -1,7 +1,7 @@
 {
   "name": "heura-brand",
-  "version": "1.0.0",
-  "description": "Brand guidelines and design skills for Heura presentations and visual communications. Includes the heura-brand-deck skill for applying 2026 brand guidelines (colors, typography, layout) to any presentation or slide deck.",
+  "version": "1.1.0",
+  "description": "Brand guidelines and design skills for Heura presentations and documents. Includes heura-brand-deck (2026 brand for any .pptx/slide deck) and heura-brand-doc (official Heura Word template for any .doc/.docx document).",
   "author": {
     "name": "Heura Foods IT",
     "email": "it@heurafoods.com"

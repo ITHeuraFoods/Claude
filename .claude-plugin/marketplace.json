@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Marketplace interno de Heura Foods para plugins de Claude Code.",
-    "version": "1.2.0"
+    "version": "1.3.0"
   },
   "plugins": [
     {
@@ -17,7 +17,7 @@
     {
       "name": "heura-brand",
       "source": "./plugins/heura-brand",
-      "description": "Directrices de marca para presentaciones y comunicaciones. Incluye heura-brand-deck para aplicar automáticamente el brand Heura 2026 a cualquier presentación."
+      "description": "Directrices de marca para presentaciones y documentos. Incluye heura-brand-deck (brand Heura 2026 en cualquier .pptx) y heura-brand-doc (plantilla Word oficial de Heura en cualquier .doc/.docx)."
     }
   ]
 }

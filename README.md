@@ -7,7 +7,7 @@ Marketplace interno de Heura Foods. Contiene los plugins de Claude Code que usa 
 | Plugin | Descripción |
 |--------|-------------|
 | `heura-erp` | Consultas en lenguaje natural a SAP S/4HANA y Odoo + dashboards. Incluye las normas de negocio internas. |
-| `heura-brand` | Directrices de marca para presentaciones y comunicaciones. Incluye `heura-brand-deck` para aplicar automáticamente el brand Heura 2026 a cualquier presentación. |
+| `heura-brand` | Directrices de marca para presentaciones y documentos. Incluye `heura-brand-deck` (brand Heura 2026 en cualquier presentación `.pptx`) y `heura-brand-doc` (plantilla Word oficial de Heura para cualquier `.doc`/`.docx`). |
 
 ## Instalación (usuario individual)
 
