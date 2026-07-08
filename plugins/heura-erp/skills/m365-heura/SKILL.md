@@ -46,6 +46,21 @@ Si `C:\heura-mcp\graph_login_remote.py` no existe, el despliegue de Intune (`int
 - `send_email(user_email, to, subject, body, body_type, cc)` — envía email en nombre del usuario
   - `body_type`: "HTML" (default) o "Text"
   - `cc`: opcional, separados por coma
+- `list_emails(user_email, top, folder, only_with_attachments, search)` — lista correos para obtener su `id`
+  - `folder`: `inbox` (default), `sentitems`, `drafts`...
+  - `only_with_attachments`: `true` para ver solo correos con adjuntos
+  - `search`: texto a buscar (asunto/remitente/cuerpo)
+- `list_attachments(user_email, message_id)` — lista los adjuntos de un correo (nombre, tipo, tamaño)
+- `get_attachment(user_email, message_id, attachment_id)` — descarga un adjunto (devuelve `content_base64`)
+
+### Leer y trabajar adjuntos de un correo
+
+1. `list_emails(user_email, only_with_attachments=true, search="...")` → localiza el correo y copia su `id`.
+2. `list_attachments(user_email, message_id)` → elige el adjunto por nombre y copia su `id`.
+3. `get_attachment(user_email, message_id, attachment_id)` → devuelve `content_base64`.
+4. Decodifica el base64 y **escríbelo en el scratchpad** (p. ej. `factura.pdf`), luego ábrelo con `Read` o la skill correspondiente (`pdf`, `xlsx`, `docx`...) para trabajarlo.
+   - No muestres el base64 al usuario; guárdalo directamente en fichero.
+   - Adjuntos >10 MB devuelven error: en ese caso súbelo a OneDrive.
 
 ### Calendario
 - `list_calendar_events(user_email, days)` — lista próximos eventos (default: 7 días)
