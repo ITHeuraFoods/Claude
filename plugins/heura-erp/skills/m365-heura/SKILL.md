@@ -1,9 +1,9 @@
 ---
 name: m365-heura
-description: Interactúa con Microsoft 365 de Heura en nombre del usuario. Úsala cuando el usuario quiera enviar emails, crear o consultar eventos de calendario, subir ficheros a OneDrive/SharePoint, o enviar mensajes en Teams. Gestiona el login M365 automáticamente si no hay sesión activa.
+description: Interactúa con Microsoft 365 de Heura en nombre del usuario. Úsala cuando el usuario quiera enviar emails, crear o consultar eventos de calendario, subir ficheros a OneDrive/SharePoint, enviar mensajes en Teams, o consultar sus tareas y listas de Microsoft To Do (tareas pendientes, to-dos, tasks). Gestiona el login M365 automáticamente si no hay sesión activa.
 ---
 
-# M365 Heura — Email, Calendario, OneDrive y Teams
+# M365 Heura — Email, Calendario, OneDrive, Teams y To Do
 
 Esta skill conecta con Microsoft Graph API a través del MCP `graph-heura-remote` y actúa
 con la identidad real del usuario (OAuth 2.0 delegado).
@@ -78,6 +78,26 @@ Si `C:\heura-mcp\graph_login_remote.py` no existe, el despliegue de Intune (`int
 - `send_teams_chat_message(user_email, chat_id, message)` — mensaje en chat 1:1 o grupal
   - `team_id` / `channel_id` / `chat_id`: GUIDs obtenibles desde la URL de Teams
 
+### Microsoft To Do
+
+**Solo lectura** (el permiso concedido en Entra es `Tasks.Read`). No existen tools para crear,
+completar ni borrar tareas; requerirían `Tasks.ReadWrite`.
+
+- `list_todo_lists(user_email)` — lista las listas de tareas del usuario
+  - Devuelve `id`, `displayName`, `wellknownListName`, `isOwner`, `isShared`
+  - La lista por defecto es la que tiene `wellknownListName == "defaultList"`
+- `list_todo_tasks(user_email, list_id, top, include_completed)` — tareas de una lista
+  - `list_id`: opcional; vacío = lista por defecto
+  - `top`: cuántas devolver (default 50), ordenadas por fecha de creación descendente
+  - `include_completed`: `false` (default) oculta las completadas
+  - Devuelve `id`, `title`, `status`, `importance`, `dueDateTime`, `createdDateTime`,
+    `lastModifiedDateTime` y `body` truncado a 500 caracteres
+- `get_todo_task(user_email, list_id, task_id)` — una tarea con sus subelementos (`checklistItems`)
+
+**Aviso de sesión:** estas tools piden un scope adicional (`Tasks.Read`) que las sesiones M365
+antiguas no tienen. Si devuelven `No se pudo renovar el token`, el probe de calendario del Paso 0
+**no** lo detecta: hay que volver a ejecutar el login (ver "Login automático") y reintentar.
+
 ## Flujo estándar
 
 1. Confirmar email del usuario
@@ -97,3 +117,6 @@ Si `C:\heura-mcp\graph_login_remote.py` no existe, el despliegue de Intune (`int
 
 **Teams:**
 > "Manda un mensaje al canal General del equipo de Finanzas diciendo que el informe está listo"
+
+**To Do:**
+> "¿Qué tareas tengo pendientes en To Do?"

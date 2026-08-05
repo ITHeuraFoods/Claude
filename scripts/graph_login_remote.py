@@ -11,7 +11,8 @@ CLIENT_ID  = "1f5ff61e-43dc-48fe-af84-d9c3f558dbcc"
 TENANT_ID  = "4ff8acc2-4c1a-49ba-9344-9e47d370f6fc"
 AUTHORITY  = f"https://login.microsoftonline.com/{TENANT_ID}"
 SCOPES     = ["Mail.Send", "Mail.ReadWrite", "Calendars.ReadWrite",
-              "Files.ReadWrite.All", "Chat.ReadWrite", "ChannelMessage.Send"]
+              "Files.ReadWrite.All", "Chat.ReadWrite", "ChannelMessage.Send",
+              "Tasks.Read"]
 
 # IP fija del hub MCP (laptop-itadm): el hostname solo resuelve vía Tailscale MagicDNS,
 # que los laptops de empleados no tienen. La IP funciona en LAN y por SSL-VPN Fortinet

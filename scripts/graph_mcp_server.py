@@ -12,13 +12,18 @@ TENANT_ID = "4ff8acc2-4c1a-49ba-9344-9e47d370f6fc"
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
 SCOPES    = ["Mail.Send", "Mail.ReadWrite", "Calendars.ReadWrite", "Files.ReadWrite.All",
              "Chat.ReadWrite", "ChannelMessage.Send"]
+# Scopes ampliados solo para las tools de Microsoft To Do. NO añadir Tasks.Read a SCOPES:
+# las cachés MSAL ya emitidas no lo contienen y acquire_token_silent devolvería None para
+# todos los usuarios, rompiendo correo, calendario, OneDrive y Teams hasta que cada uno
+# volviese a loguearse. Así solo To Do falla —con mensaje claro— hasta el nuevo login.
+TODO_SCOPES = SCOPES + ["Tasks.Read"]
 TOKEN_DIR = r"C:\heura-mcp\m365_tokens"
 GRAPH     = "https://graph.microsoft.com/v1.0"
 
 mcp = FastMCP("graph-heura", host="0.0.0.0", port=3002)
 
 
-def _get_token(user_email: str) -> str:
+def _get_token(user_email: str, scopes: list | None = None) -> str:
     safe = user_email.strip().replace("@", "_").replace(".", "_")
     path = os.path.join(TOKEN_DIR, f"{safe}.json")
     if not os.path.exists(path):
@@ -35,7 +40,7 @@ def _get_token(user_email: str) -> str:
     if not accounts:
         raise ValueError(f"Token caducado para {user_email}. Vuelve a hacer doble clic en 'Conectar M365 con Claude'.")
 
-    result = app.acquire_token_silent(SCOPES, account=accounts[0])
+    result = app.acquire_token_silent(scopes or SCOPES, account=accounts[0])
     if cache.has_state_changed:
         with open(path, "w") as f:
             f.write(cache.serialize())
@@ -45,8 +50,8 @@ def _get_token(user_email: str) -> str:
     return result["access_token"]
 
 
-def _call(method: str, endpoint: str, user_email: str, **kwargs):
-    token   = _get_token(user_email)
+def _call(method: str, endpoint: str, user_email: str, scopes: list | None = None, **kwargs):
+    token   = _get_token(user_email, scopes)
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     r = requests.request(method, f"{GRAPH}{endpoint}", headers=headers, **kwargs)
     r.raise_for_status()
@@ -274,6 +279,121 @@ def send_teams_chat_message(user_email: str, chat_id: str, message: str) -> dict
     payload = {"body": {"contentType": "html", "content": message}}
     result  = _call("POST", f"/chats/{chat_id}/messages", user_email, json=payload)
     return {"status": "enviado", "id": result.get("id")}
+
+
+# ── MICROSOFT TO DO ──────────────────────────────────────────────────────────
+# Solo lectura: el permiso concedido en Entra es Tasks.Read.
+# TODO: escritura (crear / completar / borrar tareas) requiere Tasks.ReadWrite en Entra ID.
+
+
+def _flatten_todo_task(t: dict) -> dict:
+    """Aplana un todoTask de Graph: dueDateTime a ISO simple y body a texto truncado."""
+    due = t.get("dueDateTime") or {}
+    body = t.get("body") or {}
+    content = (body.get("content") or "").strip()
+    return {
+        "id": t.get("id"),
+        "title": t.get("title"),
+        "status": t.get("status"),
+        "importance": t.get("importance"),
+        "dueDateTime": due.get("dateTime"),
+        "dueTimeZone": due.get("timeZone"),
+        "createdDateTime": t.get("createdDateTime"),
+        "lastModifiedDateTime": t.get("lastModifiedDateTime"),
+        "body": content[:500] + ("…" if len(content) > 500 else ""),
+    }
+
+
+def _default_todo_list_id(user_email: str) -> str:
+    """Devuelve el id de la lista por defecto de To Do (o la primera si no existe)."""
+    lists = _call("GET", "/me/todo/lists", user_email, scopes=TODO_SCOPES).get("value", [])
+    if not lists:
+        raise ValueError(f"{user_email} no tiene ninguna lista de Microsoft To Do.")
+    for l in lists:
+        if l.get("wellknownListName") == "defaultList":
+            return l["id"]
+    return lists[0]["id"]
+
+
+@mcp.tool()
+def list_todo_lists(user_email: str) -> list:
+    """
+    Lista las listas de tareas de Microsoft To Do del usuario.
+    - user_email: email M365 del usuario (ej: ana@heurafoods.com)
+    Devuelve id, displayName, wellknownListName, isOwner, isShared por cada lista.
+    La lista por defecto es la que tiene wellknownListName == 'defaultList'.
+    """
+    result = _call("GET", "/me/todo/lists", user_email, scopes=TODO_SCOPES)
+    return [
+        {
+            "id": l.get("id"),
+            "displayName": l.get("displayName"),
+            "wellknownListName": l.get("wellknownListName"),
+            "isOwner": l.get("isOwner"),
+            "isShared": l.get("isShared"),
+        }
+        for l in result.get("value", [])
+    ]
+
+
+@mcp.tool()
+def list_todo_tasks(user_email: str, list_id: str = "", top: int = 50,
+                    include_completed: bool = False) -> list:
+    """
+    Lista las tareas de una lista de Microsoft To Do.
+    - user_email: email M365 del usuario
+    - list_id: (opcional) id de la lista (list_todo_lists). Vacío = lista por defecto
+    - top: cuántas tareas devolver (default 50)
+    - include_completed: si True incluye también las tareas ya completadas
+    Devuelve id, title, status, importance, dueDateTime, createdDateTime,
+    lastModifiedDateTime y body truncado a 500 caracteres.
+    """
+    if not list_id:
+        list_id = _default_todo_list_id(user_email)
+
+    select = ("id,title,status,importance,dueDateTime,createdDateTime,"
+              "lastModifiedDateTime,body")
+    base = f"/me/todo/lists/{list_id}/tasks?$select={select}&$top={top}&$orderby=createdDateTime desc"
+
+    if include_completed:
+        result = _call("GET", base, user_email, scopes=TODO_SCOPES)
+        return [_flatten_todo_task(t) for t in result.get("value", [])]
+
+    # Graph no garantiza aceptar $filter sobre status combinado con $orderby en todoTask
+    # (mismo tipo de limitación que $search en list_emails). Si devuelve 400, reintenta
+    # sin $filter y descarta las completadas en Python.
+    try:
+        result = _call("GET", base + "&$filter=status ne 'completed'",
+                       user_email, scopes=TODO_SCOPES)
+        return [_flatten_todo_task(t) for t in result.get("value", [])]
+    except requests.exceptions.HTTPError as e:
+        if e.response is None or e.response.status_code != 400:
+            raise
+        result = _call("GET", base, user_email, scopes=TODO_SCOPES)
+        return [_flatten_todo_task(t) for t in result.get("value", [])
+                if t.get("status") != "completed"]
+
+
+@mcp.tool()
+def get_todo_task(user_email: str, list_id: str, task_id: str) -> dict:
+    """
+    Devuelve una tarea de To Do con sus subelementos (checklist).
+    - user_email: email M365 del usuario
+    - list_id: id de la lista (list_todo_lists)
+    - task_id: id de la tarea (list_todo_tasks)
+    """
+    result = _call("GET", f"/me/todo/lists/{list_id}/tasks/{task_id}?$expand=checklistItems",
+                   user_email, scopes=TODO_SCOPES)
+    task = _flatten_todo_task(result)
+    task["checklistItems"] = [
+        {
+            "id": c.get("id"),
+            "displayName": c.get("displayName"),
+            "isChecked": c.get("isChecked"),
+        }
+        for c in result.get("checklistItems", [])
+    ]
+    return task
 
 
 # ── REGISTRO REMOTO DE TOKEN (puerto 3003) ───────────────────────────────────
