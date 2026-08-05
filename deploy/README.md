@@ -60,7 +60,8 @@ Comprobar en este orden:
    ha corrido o falló (ver log 1).
 4. Existe `C:\heura-mcp\graph_login_remote.py` — necesario para el login M365.
 5. `Test-NetConnection 172.6.2.2 -Port 3002` — el MCP hub se alcanza por IP fija, tanto en
-   la LAN de oficina como por SSL-VPN (ver `docs/fortinet-vpn-mcp-access.md`). El hostname
+   la LAN de oficina como por SSL-VPN (ver `fortinet-vpn-mcp-access.md` en el repo privado
+   `ITHeuraFoods/Claude-docs`). El hostname
    `laptop-itadm` NO resuelve en los laptops (solo vía Tailscale del equipo de IT); por eso
    el `.mcp.json` del plugin usa la IP.
 6. En Claude Code: `/plugin` para ver si `heura-erp@heura` está instalado y `/mcp` para el

@@ -31,7 +31,9 @@ no con una cuenta de servicio compartida. Sin esto, todos los usuarios de la IA 
 los datos con los permisos de la cuenta de servicio, ignorando los roles SAP/Odoo de
 cada persona.
 
-Ver documentación técnica completa: [`docs/delegated-auth-architecture.md`](docs/delegated-auth-architecture.md)
+Ver documentación técnica completa en el repo privado
+[`ITHeuraFoods/Claude-docs`](https://github.com/ITHeuraFoods/Claude-docs) →
+`delegated-auth-architecture.md` (acceso: equipo de IT).
 
 **Resumen de tareas (Basis + IT + Dev, ~3-4 semanas):**
 - Basis: configurar SAP IAS federado con Azure AD + activar OAuth 2.0 en SAP (`SOAUTH2`)
