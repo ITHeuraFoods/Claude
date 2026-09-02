@@ -1,0 +1,44 @@
+# Caddy delante del MCP hub. Certificado de Let's Encrypt automático: lo único que hace
+# falta es que el A/AAAA de mcp.heurafoods.com apunte a esta máquina y que el 80 y el 443
+# estén abiertos (el 80 solo para el reto ACME).
+#
+# Sustituye CADDY_SITE_PLACEHOLDER por el hostname real antes de desplegar. cloud-init.yaml
+# lo hace solo. El token es deliberadamente distinto de MCP_HOSTNAME para que el buscar
+# y reemplazar que se hace sobre cloud-init.yaml no lo pise también aquí.
+
+CADDY_SITE_PLACEHOLDER {
+	encode zstd gzip
+
+	# Log de acceso aparte del log de auditoría de la aplicación. Este dice quién llamó
+	# desde dónde; el de la app dice qué hizo. Los dos hacen falta para investigar algo.
+	log {
+		output file /var/log/caddy/mcp-access.log {
+			roll_size 20mb
+			roll_keep 10
+		}
+		format json
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# Fase 4 — cuando exista el MCP de SAP, descomentar. Va antes del handle genérico:
+	# el servidor de M365 registra su endpoint en /graph/mcp, así que no hay solapamiento
+	# de rutas ni hay que reescribir prefijos.
+	# handle /sap/* {
+	# 	reverse_proxy 127.0.0.1:3001
+	# }
+
+	handle {
+		reverse_proxy 127.0.0.1:3002 {
+			# Sin buffering de la respuesta. El servidor va con json_response, así que hoy
+			# no usa SSE, pero esto lo deja listo si algún día se quita esa opción.
+			flush_interval -1
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+}

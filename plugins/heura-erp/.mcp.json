@@ -6,7 +6,10 @@
     },
     "graph-heura-remote": {
       "type": "http",
-      "url": "http://172.6.2.2:3002/mcp"
+      "url": "https://mcp.heurafoods.com/graph/mcp",
+      "headers": {
+        "Authorization": "Bearer ${HEURA_MCP_TOKEN:-sin-token}"
+      }
     }
   }
 }

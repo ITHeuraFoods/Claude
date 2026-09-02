@@ -1,0 +1,69 @@
+[Unit]
+Description=Heura MCP — Microsoft 365 (Graph)
+Documentation=https://github.com/ITHeuraFoods/Claude/blob/main/infra/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=heura-mcp
+Group=heura-mcp
+WorkingDirectory=/opt/heura-mcp
+
+# Config no sensible. El client secret NO va aquí: se entrega por LoadCredential (abajo),
+# porque un EnvironmentFile acaba en /proc/<pid>/environ y lo lee cualquier proceso del
+# mismo usuario.
+EnvironmentFile=/etc/heura-mcp/graph.env
+
+# systemd copia el secreto a un tmpfs solo legible por este servicio y expone su ruta en
+# %d. El servidor admite la indirección {VAR}_FILE justamente para esto.
+LoadCredential=entra-secret:/etc/heura-mcp/entra-client-secret
+Environment=HEURA_ENTRA_CLIENT_SECRET_FILE=%d/entra-secret
+
+ExecStart=/opt/heura-mcp/venv/bin/python /opt/heura-mcp/scripts/graph_mcp_server.py
+
+Restart=always
+RestartSec=3
+# Sustituye a "un portátil con una consola abierta": si el proceso muere, vuelve solo.
+# Si falla en bucle, systemd deja de reintentar y queda en failed (visible en /health).
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# /var/lib/heura-mcp, creado y con dueño correcto en cada arranque.
+StateDirectory=heura-mcp
+StateDirectoryMode=0700
+
+# Log de auditoría: el servidor escribe JSON por línea a stdout y journald lo recoge.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=heura-graph-mcp
+
+# ── Endurecimiento ──────────────────────────────────────────────────────────
+# Esta máquina guarda refresh tokens de M365 de toda la plantilla; el servicio no
+# necesita nada del sistema más que su directorio de estado y salida a internet.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+# MemoryDenyWriteExecute= se deja fuera a propósito: rompe algunas wheels con extensiones
+# nativas (cffi/cryptography, que entran como dependencia de msal).
+
+[Install]
+WantedBy=multi-user.target

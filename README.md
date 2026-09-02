@@ -22,9 +22,22 @@ Para actualizar cuando se publiquen cambios:
 /plugin update heura-erp@heura heura-brand@heura
 ```
 
+## Infraestructura del MCP Hub
+
+Los MCP que usan estos plugins corren en un servidor, no en el equipo del usuario.
+
+| MCP | Dónde corre | Estado |
+|-----|-------------|--------|
+| `graph-heura-remote` (M365) | `https://mcp.heurafoods.com` | Migrado a servidor propio, con TLS y bearer por usuario. **Sin VPN.** |
+| `sap-heura-remote` (SAP) | `laptop-itadm` (`172.6.2.2:3001`) | Pendiente de migrar. Requiere VPN. |
+
+Despliegue, runbook y operación del hub de M365: [`infra/README.md`](infra/README.md).
+El alta de cada usuario es abrir `https://mcp.heurafoods.com/auth/login` una vez.
+
 ## Prerequisito de seguridad — Autenticación delegada por usuario
 
-> ⚠️ **OBLIGATORIO antes del despliegue org-wide.**
+> ⚠️ **OBLIGATORIO antes de centralizar SAP.** M365 ya autentica cada llamada con la
+> identidad real del usuario; SAP todavía no.
 
 El MCP Hub debe autenticar cada llamada a SAP y Odoo con la identidad real del usuario,
 no con una cuenta de servicio compartida. Sin esto, todos los usuarios de la IA verían

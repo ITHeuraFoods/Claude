@@ -1,5 +1,5 @@
 # Ejecutar en Intune con "Run as logged on user = No" (SYSTEM)
-# Instala managed-settings.json, el script de login M365 y las fuentes corporativas.
+# Instala managed-settings.json y las fuentes corporativas.
 #
 # Ruta correcta en Windows para que Claude Code lea la config gestionada (v2.1.75+):
 # C:\Program Files\ClaudeCode\ — la ruta legacy C:\ProgramData\ClaudeCode\ ya no se soporta.
@@ -45,11 +45,14 @@ try {
     Remove-Item -Force -ErrorAction SilentlyContinue "$dest\managed-mcp.json"
     Remove-Item -Force -ErrorAction SilentlyContinue "C:\ProgramData\ClaudeCode\managed-mcp.json"
 
-    # Script de login M365 remoto — ruta fija de máquina, la misma que espera la skill m365-heura
-    # (ver "Login automático" en el SKILL.md del plugin heura-erp). Va aquí, no en el script de
-    # usuario, porque C:\heura-mcp requiere permisos de administrador para crearse.
-    New-Item -ItemType Directory -Force "C:\heura-mcp" | Out-Null
-    Get-RemoteFile "$base/scripts/graph_login_remote.py" "C:\heura-mcp\graph_login_remote.py"
+    # Limpieza del montaje anterior del MCP de M365. El login ya no se hace con un script
+    # local: se hace en el navegador contra https://mcp.heurafoods.com/auth/login, así que
+    # C:\heura-mcp ya no hace falta en la flota. El acceso directo del escritorio se borra
+    # porque llevaba el secreto de registro incrustado en sus argumentos.
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "C:\heura-mcp"
+    Get-ChildItem "C:\Users\*\Desktop\Conectar M365 con Claude.lnk" -ErrorAction SilentlyContinue |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+    Write-Output "OK: limpieza del login M365 antiguo"
 
     # Fuentes: si fallan no deben bloquear el despliegue del plugin/MCP.
     try {

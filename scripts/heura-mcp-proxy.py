@@ -4,21 +4,29 @@ Claude Desktop lanza este script como proceso local (stdio MCP).
 El script reenvía las llamadas al servidor MCP HTTP remoto.
 
 Uso: python heura-mcp-proxy.py <url>
+
+El hub de M365 exige bearer token: se toma de HEURA_MCP_TOKEN (el que da
+https://mcp.heurafoods.com/auth/login). Sin él, el hub responde 401.
 """
+import os
 import sys
 import json
 import requests
 
 if len(sys.argv) < 2:
-    sys.exit("Uso: python heura-mcp-proxy.py <url>  (ej: http://172.6.2.2:3001/mcp)")
+    sys.exit("Uso: python heura-mcp-proxy.py <url>  "
+             "(ej: https://mcp.heurafoods.com/graph/mcp)")
 
 SERVER_URL = sys.argv[1]
+AUTH_TOKEN = os.environ.get("HEURA_MCP_TOKEN", "").strip()
 session_id = None
 
 
 def forward(msg: dict):
     global session_id
     headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
+    if AUTH_TOKEN:
+        headers["Authorization"] = f"Bearer {AUTH_TOKEN}"
     if session_id:
         headers["Mcp-Session-Id"] = session_id
 

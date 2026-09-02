@@ -10,6 +10,7 @@ desactivar localmente.
 | Fichero | Propósito |
 |---------|-----------|
 | `managed-settings.json` | Instala el marketplace y activa el plugin `heura-erp` |
+| `intune-deploy-system.ps1` | Script SYSTEM: despliega lo anterior y limpia el login M365 antiguo |
 | `install-fonts.ps1` | Instala las fuentes corporativas Heura y Pixel Grafiti |
 | `fonts/Heura.ttf` | Fuente custom brand (headings) — **añadir manualmente** |
 | `fonts/Pixel-Grafiti.ttf` | Fuente decorativa custom — **añadir manualmente** |
@@ -30,17 +31,19 @@ desactivar localmente.
 
 ## Cómo desplegar
 
-- **Windows (Intune):** dos *Platform scripts* (Devices → Scripts and remediations):
-  1. `intune-deploy-system.ps1` — "Run this script using the logged on credentials" = **No**
-     (SYSTEM). Instala `managed-settings.json`, `C:\heura-mcp\graph_login_remote.py` y fuentes.
-  2. `intune-wrapper-user.ps1` — "Run this script using the logged on credentials" = **Yes**.
-     Es un wrapper local (gitignored, contiene el secreto de registro) que descarga y ejecuta
-     `intune-deploy-user.ps1` del repo para crear el acceso directo de login M365.
+- **Windows (Intune):** un único *Platform script* (Devices → Scripts and remediations):
+  `intune-deploy-system.ps1` — "Run this script using the logged on credentials" = **No**
+  (SYSTEM). Instala `managed-settings.json` y las fuentes, y limpia el montaje antiguo del
+  login M365 (`C:\heura-mcp\` y el acceso directo del escritorio).
 
-  Program Files requiere permisos de administrador, por eso van en scripts separados con
-  distinto contexto. Los scripts se auto-relanzan en 64 bits y devuelven código de salida
-  real, así Intune reintenta si algo falla. **Ojo:** los platform scripts solo se re-ejecutan
-  si cambia su contenido en Intune — tras corregir un script hay que volver a subirlo.
+  Antes hacían falta dos scripts, porque el de usuario creaba un acceso directo con el
+  secreto de registro incrustado en sus argumentos. El login de M365 ya se hace en el
+  navegador contra el hub, así que ese script y su wrapper local se han eliminado: si
+  siguen dados de alta en Intune, quítalos.
+
+  El script se auto-relanza en 64 bits y devuelve código de salida real, así Intune
+  reintenta si algo falla. **Ojo:** los platform scripts solo se re-ejecutan si cambia su
+  contenido en Intune — tras corregir un script hay que volver a subirlo.
 - **macOS (Jamf / MDM):** desplegar a `/Library/Application Support/ClaudeCode/`.
 - **Linux (Ansible / script):** copiar a `/etc/claude-code/`.
 
@@ -55,17 +58,27 @@ ningún comando.
 Comprobar en este orden:
 
 1. `C:\ProgramData\HeuraIT\claude-deploy-system.log` — resultado del script SYSTEM.
-2. `%LOCALAPPDATA%\HeuraIT\claude-deploy-user.log` — resultado del script de usuario.
-3. Existe `C:\Program Files\ClaudeCode\managed-settings.json` — si no, el script SYSTEM no
+2. Existe `C:\Program Files\ClaudeCode\managed-settings.json` — si no, el script SYSTEM no
    ha corrido o falló (ver log 1).
-4. Existe `C:\heura-mcp\graph_login_remote.py` — necesario para el login M365.
-5. `Test-NetConnection 172.6.2.2 -Port 3002` — el MCP hub se alcanza por IP fija, tanto en
-   la LAN de oficina como por SSL-VPN (ver `fortinet-vpn-mcp-access.md` en el repo privado
-   `ITHeuraFoods/Claude-docs`). El hostname
-   `laptop-itadm` NO resuelve en los laptops (solo vía Tailscale del equipo de IT); por eso
-   el `.mcp.json` del plugin usa la IP.
-6. En Claude Code: `/plugin` para ver si `heura-erp@heura` está instalado y `/mcp` para el
+3. En Claude Code: `/plugin` para ver si `heura-erp@heura` está instalado y `/mcp` para el
    estado de `graph-heura-remote` y `sap-heura-remote`.
+
+**Si falla M365 (`graph-heura-remote`):**
+
+4. `curl.exe https://mcp.heurafoods.com/health` — estado del hub. No requiere VPN.
+5. `echo %HEURA_MCP_TOKEN%` — si está vacío, el usuario no se ha dado de alta: tiene que
+   abrir `https://mcp.heurafoods.com/auth/login`, ejecutar el `setx` que le devuelve la
+   página y reiniciar Claude Code.
+6. Si `/mcp` da 401 con el token puesto, el bearer caducó (90 días) o se revocó: mismo
+   procedimiento del punto 5. Diagnóstico en el servidor con `--list-sessions`
+   (ver `infra/README.md`).
+
+**Si falla SAP (`sap-heura-remote`):** sigue en `laptop-itadm` y sigue necesitando VPN.
+
+7. `Test-NetConnection 172.6.2.2 -Port 3001` — el MCP de SAP se alcanza por IP fija, tanto
+   en la LAN de oficina como por SSL-VPN (ver `fortinet-vpn-mcp-access.md` en el repo
+   privado `ITHeuraFoods/Claude-docs`). El hostname `laptop-itadm` NO resuelve en los
+   laptops (solo vía Tailscale del equipo de IT); por eso el `.mcp.json` usa la IP.
 
 ## Nota
 
