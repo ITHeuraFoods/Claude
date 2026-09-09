@@ -1,6 +1,0 @@
-# mcp<2 a proposito: el codigo usa mcp.server.fastmcp.FastMCP, que en 2.x se
-# renombro a MCPServer. Migrar host y libreria a la vez es pedir problemas;
-# la actualizacion a 2.x es trabajo aparte.
-mcp<2
-msal
-requests
