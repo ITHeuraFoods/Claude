@@ -78,6 +78,12 @@ def connect(user=None, password=None, interactive=False):
     """
     global _session
     s = requests.Session()
+    # verify=False NO es un descuido. El certificado del gateway
+    # (*.sap.heurafoods.com, Sectigo) CADUCO el 2025-02-15 y la validacion
+    # falla con "certificate has expired": no hay contra que validar. Cuando
+    # IT lo renueve, poner s.verify = True Y cambiar SAP_HOST al nombre
+    # SAP_VHOST en vez de la IP, quitando el header Host forzado; con
+    # verify=True y una URL por IP la validacion falla igual por el nombre.
     s.verify = False
     s.headers.update({'sap-client': SAP_CLIENT, 'Host': SAP_VHOST, 'Accept': 'application/json'})
 
@@ -339,6 +345,47 @@ CATALOG = {
 # ════════════════════════════════════════════════════════════════════════════
 #  MOTOR DE CONSULTA
 # ════════════════════════════════════════════════════════════════════════════
+def _explicar_404(s, respuesta, service, entity, select):
+    """Convierte el 404 mentiroso del gateway en un error accionable.
+
+    El gateway de PS4 responde 404, con el cuerpo en aleman, cuando un campo de
+    $select no existe en la entidad. Eso se lee igual que "el servicio no esta
+    activado" y lleva a pedirle a Basis un /IWFND/MAINT_SERVICE que no hace
+    falta. Antes de propagar el error repetimos la consulta SIN $select: si esa
+    funciona, el servicio esta activo y autorizado y el problema son los
+    nombres de campo. Entonces probamos campo a campo para decir cual falla y
+    listamos los que si existen.
+    """
+    if respuesta.status_code != 404 or not select:
+        return
+
+    url = f'{SAP_HOST}{ODATA_BASE}/{service}/{entity}'
+    sonda = s.get(url, params={'$top': '1', '$format': 'json'}, timeout=60)
+    if not sonda.ok:
+        return  # el 404 es real: el servicio o la entidad no existen
+
+    malos = []
+    for campo in [c.strip() for c in select.split(',') if c.strip()]:
+        r = s.get(url, params={'$select': campo, '$top': '1', '$format': 'json'},
+                  timeout=60)
+        if r.status_code == 404:
+            malos.append(campo)
+
+    try:
+        fila = sonda.json()['d']['results'][0]
+        validos = sorted(k for k in fila if k != '__metadata')
+    except (ValueError, KeyError, IndexError):
+        validos = []
+
+    detalle = ', '.join(malos) if malos else '(no he podido aislarlo)'
+    mensaje = (f'{service}/{entity} responde correctamente: el servicio esta '
+               f'activo y autorizado. El problema esta en $select, no en '
+               f'permisos. Campos que no existen en esta entidad: {detalle}.')
+    if validos:
+        mensaje += f" Campos validos: {', '.join(validos)}."
+    raise ValueError(mensaje)
+
+
 def query(service, entity, filter=None, select=None, orderby=None,
           top=None, expand=None, all_pages=False, dedup_keys=None):
     """
@@ -374,6 +421,7 @@ def query(service, entity, filter=None, select=None, orderby=None,
         skip = 0
         while True:
             r = s.get(build(skip, 500), timeout=60)
+            _explicar_404(s, r, service, entity, select)
             r.raise_for_status()
             batch = r.json()['d']['results']
             results.extend(batch)
@@ -385,6 +433,7 @@ def query(service, entity, filter=None, select=None, orderby=None,
                 break
     else:
         r = s.get(build(0, top or 50), timeout=60)
+        _explicar_404(s, r, service, entity, select)
         r.raise_for_status()
         results = r.json()['d']['results']
 
