@@ -35,7 +35,7 @@ try {
     $wsh = New-Object -ComObject WScript.Shell
     $lnk = $wsh.CreateShortcut($shortcut)
     $lnk.TargetPath       = "powershell.exe"
-    $lnk.Arguments        = "-ExecutionPolicy Bypass -Command `"& { `$env:HEURA_REGISTER_SECRET='$RegisterSecret'; $pythonCmd '$loginScript' }; pause`""
+    $lnk.Arguments        = "-ExecutionPolicy Bypass -Command `"& { `$env:HEURA_REGISTER_SECRET='$RegisterSecret'; `$env:HEURA_MCP_URL='http://10.99.0.10:3003'; $pythonCmd '$loginScript' }; pause`""
     $lnk.WorkingDirectory = "C:\heura-mcp"
     $lnk.IconLocation     = "shell32.dll,144"
     $lnk.Description      = "Conectar cuenta M365 con Claude"

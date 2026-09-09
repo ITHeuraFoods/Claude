@@ -24,10 +24,12 @@ TODO_SCOPES = SCOPES + ["Tasks.Read"]
 # una vez hecho ese login la lectura sigue valiendo: MSAL sirve un token cacheado siempre
 # que los scopes pedidos sean subconjunto de los del token, y ReadWrite implica Read.
 TODO_WRITE_SCOPES = SCOPES + ["Tasks.ReadWrite"]
-TOKEN_DIR = r"C:\heura-mcp\m365_tokens"
+TOKEN_DIR = os.environ.get("HEURA_TOKEN_DIR", r"C:\heura-mcp\m365_tokens")
 GRAPH     = "https://graph.microsoft.com/v1.0"
 
-mcp = FastMCP("graph-heura", host="0.0.0.0", port=3002)
+# La IP de escucha se fija por entorno: en el hub es la del tunel, no 0.0.0.0.
+BIND_HOST = os.environ.get("HEURA_BIND_HOST", "0.0.0.0")
+mcp = FastMCP("graph-heura", host=BIND_HOST, port=3002)
 
 
 def _get_token(user_email: str, scopes: list | None = None) -> str:
@@ -560,6 +562,27 @@ def delete_todo_task(user_email: str, list_id: str, task_id: str,
 
 REGISTER_SECRET = os.environ.get("HEURA_REGISTER_SECRET", "")
 
+# Solo esta presente en el despliegue del hub; sin el, /register funciona pero
+# no emite token de acceso a los MCP.
+try:
+    import heura_auth
+except ImportError:
+    heura_auth = None
+
+
+def _identity_from_msal_cache(token_cache):
+    """Devuelve el correo que consta en la propia cache MSAL, o "" si no hay."""
+    try:
+        data = json.loads(token_cache)
+    except ValueError:
+        return ""
+    for acc in (data.get("Account") or {}).values():
+        if isinstance(acc, dict):
+            user = str(acc.get("username") or "").strip().lower()
+            if user:
+                return user
+    return ""
+
 
 class _RegisterHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -588,24 +611,52 @@ class _RegisterHandler(BaseHTTPRequestHandler):
 
         length = int(self.headers.get("Content-Length", 0))
         body   = json.loads(self.rfile.read(length))
-        user_email  = body.get("user_email", "").strip()
         token_cache = body.get("token_cache", "")
+        declarado   = body.get("user_email", "").strip().lower()
 
-        if not user_email or not token_cache:
-            self._respond(400, {"error": "Faltan user_email o token_cache"})
+        if not token_cache:
+            self._respond(400, {"error": "Falta token_cache"})
             return
+
+        # La identidad sale de la CACHE, no del cuerpo. Antes se confiaba en el
+        # user_email recibido, asi que quien conociera el secreto compartido
+        # podia sobrescribir la sesion de otra persona. La cache la emite Entra
+        # tras un login interactivo: solo se puede presentar una propia.
+        user_email = _identity_from_msal_cache(token_cache)
+        if not user_email:
+            self._respond(400, {"error": "No se puede deducir la identidad de la cache MSAL"})
+            return
+        if declarado and declarado != user_email:
+            print(f"AVISO /register: declaraba {declarado} pero la cache es de {user_email}",
+                  flush=True)
 
         safe = user_email.replace("@", "_").replace(".", "_")
         path = os.path.join(TOKEN_DIR, f"{safe}.json")
-        os.makedirs(TOKEN_DIR, exist_ok=True)
+        os.makedirs(TOKEN_DIR, mode=0o700, exist_ok=True)
         with open(path, "w") as f:
             f.write(token_cache)
+        # 0600 explicito: el fichero lleva el refresh token del usuario y el
+        # umask del proceso lo dejaba legible por todo el mundo.
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            pass  # en Windows no aplica
 
-        self._respond(200, {"status": "ok", "user": user_email})
+        # Token de acceso a los MCP para esa identidad, si el modulo de
+        # autenticacion esta disponible (despliegue en el hub). En un arranque
+        # suelto sin heura_auth la sesion se registra igual y no hay token.
+        token = None
+        if heura_auth is not None:
+            try:
+                token = heura_auth.issue_token(user_email)
+            except OSError as exc:
+                print(f"ERROR /register: sesion guardada pero sin token: {exc}", flush=True)
+
+        self._respond(200, {"status": "ok", "user": user_email, "token": token})
 
 
 def _start_register_server():
-    server = HTTPServer(("0.0.0.0", 3003), _RegisterHandler)
+    server = HTTPServer((BIND_HOST, 3003), _RegisterHandler)
     server.serve_forever()
 
 
