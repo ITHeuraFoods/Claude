@@ -1,0 +1,32 @@
+[Unit]
+Description=Heura - MCP de SAP S/4HANA (PS4)
+After=network-online.target strongswan.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mcpsap
+Group=mcpsap
+WorkingDirectory=/opt/heura-mcp/sap
+EnvironmentFile=/etc/heura-mcp/sap.env
+ExecStart=/opt/heura-mcp/.venv/bin/python -u /opt/heura-mcp/sap/run_sap.py
+Restart=always
+RestartSec=5
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+CapabilityBoundingSet=
+SupplementaryGroups=mcpauth
+ReadWritePaths=/var/lib/heura-mcp/sap
+
+[Install]
+WantedBy=multi-user.target
