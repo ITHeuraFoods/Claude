@@ -43,7 +43,11 @@ SERVERS      = {"sap-heura-remote":   f"http://{MCP_HOST}:3001/mcp",
 
 SECRET = os.environ.get("HEURA_REGISTER_SECRET", "")
 
-SETTINGS = Path.home() / ".claude" / "settings.json"
+# Claude Code lee los servidores MCP de ambito usuario de ~/.claude.json.
+# NO de ~/.claude/settings.json: ahi van permisos, hooks y env, y un bloque
+# mcpServers se queda inerte. Costo un piloto entero descubrirlo.
+USER_CONFIG = Path.home() / ".claude.json"
+SETTINGS    = Path.home() / ".claude" / "settings.json"
 
 
 def salir(msg, codigo=1):
@@ -64,7 +68,7 @@ def configs_existentes():
     rutas = [
         home / ".claude" / "plugins" / "marketplaces" / "heura" / "plugins" / "heura-erp" / ".mcp.json",
         SETTINGS,
-        home / ".claude.json",
+        USER_CONFIG,
     ]
     if appdata:
         rutas.append(Path(appdata) / "Claude" / "claude_desktop_config.json")
@@ -113,20 +117,18 @@ def parchear(ruta, token):
     return tocados
 
 
-def asegurar_en_settings(token):
-    """Crea los servidores en ~/.claude/settings.json si no estaban.
+def asegurar_en_user_config(token):
+    """Crea los servidores en ~/.claude.json si no estaban.
 
-    Es la configuracion de USUARIO: tiene prioridad y, sobre todo, es la unica
-    que sobrevive a un /plugin update. El .mcp.json del plugin se reescribe al
-    actualizar el marketplace y se llevaria el token por delante.
+    Es el ambito de usuario de Claude Code: donde los lee de verdad, y lo unico
+    que sobrevive a un /plugin update, porque el .mcp.json del plugin se
+    reescribe al actualizar el marketplace y se llevaria el token por delante.
     """
-    SETTINGS.parent.mkdir(parents=True, exist_ok=True)
-
-    if SETTINGS.is_file():
+    if USER_CONFIG.is_file():
         try:
-            datos = json.loads(SETTINGS.read_text(encoding="utf-8"))
+            datos = json.loads(USER_CONFIG.read_text(encoding="utf-8"))
         except ValueError:
-            print(f"  ! {SETTINGS} no es JSON valido, no lo toco")
+            print(f"  ! {USER_CONFIG} no es JSON valido, no lo toco")
             return 0
     else:
         datos = {}
@@ -145,10 +147,10 @@ def asegurar_en_settings(token):
             creadas += 1
 
     if creadas:
-        if SETTINGS.is_file():
-            _respaldar(SETTINGS)
-        SETTINGS.write_text(json.dumps(datos, indent=2, ensure_ascii=False) + "\n",
-                            encoding="utf-8")
+        if USER_CONFIG.is_file():
+            _respaldar(USER_CONFIG)
+        USER_CONFIG.write_text(json.dumps(datos, indent=2, ensure_ascii=False) + "\n",
+                               encoding="utf-8")
     return creadas
 
 
@@ -204,9 +206,9 @@ def main():
             print(f"  - {ruta}: {n} servidor(es)")
             total += n
 
-    creadas = asegurar_en_settings(token)
+    creadas = asegurar_en_user_config(token)
     if creadas:
-        print(f"  - {SETTINGS}: {creadas} servidor(es) creados")
+        print(f"  - {USER_CONFIG}: {creadas} servidor(es) creados")
         total += creadas
 
     print(f"\nListo. {total} entradas escritas.")
