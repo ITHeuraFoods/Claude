@@ -2,11 +2,11 @@
   "mcpServers": {
     "sap-heura-remote": {
       "type": "http",
-      "url": "http://10.99.0.10:3001/mcp"
+      "url": "http://mcp.heurafoods.com:3001/mcp"
     },
     "graph-heura-remote": {
       "type": "http",
-      "url": "http://10.99.0.10:3002/mcp"
+      "url": "http://mcp.heurafoods.com:3002/mcp"
     }
   }
 }

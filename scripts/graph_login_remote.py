@@ -36,7 +36,7 @@ SCOPES    = ["Mail.Send", "Mail.ReadWrite", "Calendars.ReadWrite",
 
 # Hub MCP en Hetzner, alcanzable por la LAN de Heura o por la SSL-VPN.
 # Cuando exista el registro DNS, cambiar solo estas constantes.
-MCP_HOST     = os.environ.get("HEURA_MCP_HOST", "10.99.0.10")
+MCP_HOST     = os.environ.get("HEURA_MCP_HOST", "mcp.heurafoods.com")
 REGISTER_URL = os.environ.get("HEURA_MCP_URL", f"http://{MCP_HOST}:3003")
 SERVERS      = {"sap-heura-remote":   f"http://{MCP_HOST}:3001/mcp",
                 "graph-heura-remote": f"http://{MCP_HOST}:3002/mcp"}
