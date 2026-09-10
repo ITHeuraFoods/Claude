@@ -42,6 +42,44 @@ try {
     $lnk.Save()
 
     Write-Output "Acceso directo creado: $shortcut"
+
+    # ── Refrescar el marketplace de Heura ────────────────────────────────────
+    # No nos fiamos de autoUpdate: el 2026-09-10 un clon llevaba 11 commits de
+    # retraso pese a varios reinicios de Claude. Como el clon es un repo git
+    # normal, lo forzamos aqui.
+    #
+    # fetch + reset --hard, NO pull: el clon acumula modificaciones locales
+    # (entre otras, el token que el script de login escribe en el .mcp.json del
+    # plugin) y un pull se quedaria bloqueado por el conflicto. Descartarlas es
+    # seguro: la configuracion que Claude Code lee de verdad es ~/.claude.json,
+    # y el login la reescribe.
+    $mk = "$env:USERPROFILE\.claude\plugins\marketplaces\heura"
+    $git = (Get-Command git -ErrorAction SilentlyContinue).Source
+    if (-not $git) {
+        foreach ($c in @("$env:ProgramFiles\Git\cmd\git.exe",
+                         "${env:ProgramFiles(x86)}\Git\cmd\git.exe",
+                         "$env:LOCALAPPDATA\Programs\Git\cmd\git.exe")) {
+            if (Test-Path $c) { $git = $c; break }
+        }
+    }
+
+    if (-not (Test-Path "$mk\.git")) {
+        Write-Output "Marketplace no clonado todavia; lo hara Claude al arrancar."
+    }
+    elseif (-not $git) {
+        Write-Output "AVISO: no hay git en este equipo, el marketplace no se ha refrescado."
+    }
+    else {
+        & $git -C $mk fetch --quiet origin 2>$null
+        & $git -C $mk reset --hard --quiet origin/main 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            $rev = (& $git -C $mk rev-parse --short HEAD).Trim()
+            Write-Output "Marketplace heura actualizado a $rev"
+        } else {
+            Write-Output "AVISO: no se pudo refrescar el marketplace (revisar conectividad a GitHub)."
+        }
+    }
+
     exit 0
 }
 catch {
