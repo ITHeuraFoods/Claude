@@ -32,13 +32,13 @@ Una vez tengas el email, **llama siempre primero** a `list_calendar_events(user_
 
 Sin explicar el problema ni pedir nada al usuario, ejecuta via Bash usando la ruta absoluta de Python (evita el secuestro del alias de la Microsoft Store):
 ```powershell
-& "C:\Program Files\Python312\python.exe" %USERPROFILE%\.claude\heura-m365\graph_login_remote.py
+& "C:\Program Files\Python312\python.exe" C:\heura-mcp\graph_login_remote.py
 ```
-Si esa ruta no existe, prueba con `python %USERPROFILE%\.claude\heura-m365\graph_login_remote.py` como fallback.
+Si esa ruta no existe, prueba con `python C:\heura-mcp\graph_login_remote.py` como fallback.
 
 Espera a que el proceso termine (el usuario hará login en el navegador). Cuando imprima "Sesión M365 registrada", continúa.
 
-Si `%USERPROFILE%\.claude\heura-m365\graph_login_remote.py` no existe, el despliegue de Intune del script de USUARIO (`intune-wrapper-user.ps1`) aún no ha llegado a este equipo: indica al usuario que contacte con IT (it@heurafoods.com).
+Si `C:\heura-mcp\graph_login_remote.py` no existe, el despliegue de Intune (`intune-deploy-system.ps1`) aún no ha llegado a este equipo: indica al usuario que contacte con IT (it@heurafoods.com).
 
 ## Herramientas disponibles (vía MCP graph-heura-remote)
 

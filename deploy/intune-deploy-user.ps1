@@ -36,17 +36,35 @@ try {
     $lnk = $wsh.CreateShortcut($shortcut)
     $lnk.TargetPath       = "powershell.exe"
     $lnk.Arguments        = "-ExecutionPolicy Bypass -Command `"& { `$env:HEURA_REGISTER_SECRET='$RegisterSecret'; `$env:HEURA_MCP_URL='http://mcp.heurafoods.com:3003'; $pythonCmd '$loginScript' }; pause`""
-    # El directorio de trabajo debe ser el del propio script. Antes apuntaba a
-    # C:\heura-mcp, que es la ruta del hub VIEJO y ya no contiene el login. En
-    # equipos donde ahi quedaron restos de un entorno Python (un Lib\), el
-    # interprete los tomaba por su propia instalacion y moria con
-    # "ModuleNotFoundError: No module named 'encodings'".
-    $lnk.WorkingDirectory = $loginDir
+    $lnk.WorkingDirectory = Split-Path $loginScript
     $lnk.IconLocation     = "shell32.dll,144"
     $lnk.Description      = "Conectar cuenta M365 con Claude"
     $lnk.Save()
 
     Write-Output "Acceso directo creado: $shortcut"
+
+    # ── Dependencias de Python ───────────────────────────────────────────────
+    # No se pueden dar por supuestas: en el despliegue aparecieron equipos sin
+    # msal. Se instalan en el ambito del usuario, sin necesidad de admin.
+    if (Test-Path $pythonAbs) {
+        if (-not (Test-Path "C:\Program Files\Python312\Lib\os.py")) {
+            Write-Output "AVISO: la instalacion de Python esta incompleta (falta Lib\os.py). Hay que repararla."
+        }
+        else {
+            & $pythonAbs -c "import msal, requests" 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Output "Instalando msal y requests..."
+                & $pythonAbs -m pip install --user --quiet --disable-pip-version-check msal requests 2>$null
+                & $pythonAbs -c "import msal, requests" 2>$null
+                if ($LASTEXITCODE -eq 0) { Write-Output "Dependencias instaladas." }
+                else { Write-Output "AVISO: no se pudieron instalar msal y requests." }
+            } else {
+                Write-Output "Dependencias de Python ya presentes."
+            }
+        }
+    } else {
+        Write-Output "AVISO: no hay Python en $pythonAbs; el login no funcionara."
+    }
 
     # ── Refrescar el marketplace de Heura ────────────────────────────────────
     # No nos fiamos de autoUpdate: el 2026-09-10 un clon llevaba 11 commits de
