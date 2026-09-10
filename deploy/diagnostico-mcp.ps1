@@ -99,11 +99,21 @@ if ($tcp) {
 # 6. Python, que necesita el script de login
 $py = "C:\Program Files\Python312\python.exe"
 if (Test-Path $py) {
-    $mods = & $py -c "import msal, requests; print('ok')" 2>$null
-    if ($mods -eq "ok") { Reporta $ok "Python 3.12 con msal y requests" }
+    # Primero que el interprete arranque. Si le falta la biblioteca estandar,
+    # toma el directorio actual como prefijo y muere con
+    # "ModuleNotFoundError: No module named 'encodings'", que no tiene nada que
+    # ver con las dependencias.
+    if (-not (Test-Path "C:\Program Files\Python312\Lib\os.py")) {
+        Reporta $ko "la instalacion de Python esta incompleta (falta Lib\os.py)"
+        $problemas += "Reparar Python 3.12: Aplicaciones > Python 3.12 > Modificar > Repair"
+    }
     else {
-        Reporta $ko "Python esta, pero faltan msal o requests"
-        $problemas += "Instalar dependencias: & '$py' -m pip install msal requests"
+        $mods = & $py -c "import msal, requests; print('ok')" 2>$null
+        if ($mods -eq "ok") { Reporta $ok "Python 3.12 con msal y requests" }
+        else {
+            Reporta $ko "Python arranca, pero faltan msal o requests"
+            $problemas += "Instalar dependencias: & '$py' -m pip install msal requests"
+        }
     }
 } else {
     Reporta $ko "no esta Python en $py"
