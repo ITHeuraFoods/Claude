@@ -31,7 +31,18 @@ if (Test-Path $managed) {
 # 2. Marketplace clonado
 $mk = "$env:USERPROFILE\.claude\plugins\marketplaces\heura"
 if (Test-Path $mk) {
-    Reporta $ok "marketplace heura clonado"
+    $rev = ""
+    $git = (Get-Command git -ErrorAction SilentlyContinue).Source
+    if (-not $git -and (Test-Path "$env:ProgramFiles\Git\cmd\git.exe")) { $git = "$env:ProgramFiles\Git\cmd\git.exe" }
+    if ($git -and (Test-Path "$mk\.git")) { $rev = (& $git -C $mk rev-parse --short HEAD 2>$null) }
+    Reporta $ok "marketplace heura clonado$(if ($rev) { " (commit $rev)" })"
+    $skill = "$mk\plugins\heura-erp\skills\sap-heura\SKILL.md"
+    if ((Test-Path $skill) -and (Select-String -Path $skill -Pattern "sap-heura-remote" -Quiet)) {
+        Reporta $ok "la skill sap-heura ya usa el MCP"
+    } else {
+        Reporta $wr "la skill sap-heura es la version vieja (ejecuta scripts en local)"
+        $problemas += "Refrescar el marketplace: volver a lanzar el script de usuario de Intune"
+    }
 } else {
     Reporta $ko "el marketplace heura NO esta clonado"
     $problemas += "Claude no ha arrancado desde que llego la politica: CERRAR Claude del todo y volver a abrirlo"
