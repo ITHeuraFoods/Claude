@@ -5,144 +5,106 @@ description: Consulta SAP S/4HANA de Heura en lenguaje natural. Úsala cuando el
 
 # SAP Heura — Consultas en lenguaje natural
 
-Esta skill conecta con SAP S/4HANA (sistema PS4, mandante 100) vía OData y permite
-responder preguntas de negocio con datos reales, y generar dashboards HTML.
+Esta skill consulta SAP S/4HANA (sistema **PS4, mandante 100**) a través del MCP
+**`sap-heura-remote`**, que corre en el hub de Heura y habla OData con el gateway.
+
+## Cómo se consulta
+
+**Usa siempre la tool `query_sap` del MCP `sap-heura-remote`.** No ejecutes Python
+en el equipo del usuario para hablar con SAP.
+
+```
+query_sap(service=..., entity=..., filter=..., select=..., top=...)
+```
+
+Los scripts de `scripts/` son **break-glass**: solo si el hub está caído, y sabiendo
+lo que se hace. Ver la sección final.
+
+**Si `sap-heura-remote` no aparece o no responde**, no busques rodeos: dile al usuario
+que compruebe que está en la red de Heura o con la VPN conectada, y que si persiste
+ejecute el diagnóstico que le pasará IT. No intentes suplirlo con los scripts locales:
+usan credenciales distintas y dan resultados distintos.
 
 ## Normas de negocio (convenciones Heura — aplícalas SIEMPRE)
 
-Estas reglas son de obligado cumplimiento en cada consulta:
-
-- **Cantidades recibidas → filtra por fecha de entrada de mercancía (Goods Receipt Date).**
-  Cuando el usuario pregunte por cantidades *recibidas* (no pedidas), filtra por la fecha de
-  contabilización de la entrada de mercancía (`PostingDate` de la cabecera del documento de
-  material, movimientos 101 menos 102), NO por la fecha del pedido. Las cantidades *pedidas*
+- **Cantidades recibidas → filtra por fecha de entrada de mercancía.** Cuando pregunten
+  por cantidades *recibidas* (no pedidas), filtra por la fecha de contabilización de la
+  entrada de mercancía (`PostingDate` de la cabecera del documento de material,
+  movimientos 101 menos 102), **no** por la fecha del pedido. Las cantidades *pedidas*
   sí usan `PurchaseOrderDate`.
+- **`FI_ASIENTOS` exige filtro obligatorio**:
+  `CompanyCode eq '1000' and LedgerFiscalYear eq '2026' and Ledger eq '0L'`.
+- **Nunca pidas ni aceptes la contraseña de SAP por el chat.** El MCP autentica en el
+  hub; el usuario no tiene que darte credenciales nunca.
 
-## Ubicación de los scripts
+## Paso 1 — Elegir servicio y entidad
 
-Los scripts están en la carpeta de esta skill. La ruta base se indica en la cabecera
-"Base directory for this skill:" que aparece al cargar la skill. Úsala como variable
-`$SKILL_DIR` en todos los comandos. Ejemplo:
+Busca el área en **`references/catalogo-odata.md`**: 21 áreas de negocio con su
+servicio, entidad, entidades de líneas y campos útiles. **No inventes nombres de
+servicio**; si no está en el catálogo, pregunta antes de probar a ciegas.
 
-```
-$SKILL_DIR = <base directory indicado en la cabecera>
-```
+## Paso 2 — Construir la consulta
 
-Ejecuta SIEMPRE con rutas absolutas a `$SKILL_DIR\scripts\sap_connector.py` y
-`$SKILL_DIR\scripts\sap_login.ps1`. Nunca uses rutas relativas ni hardcodees un
-nombre de usuario de Windows.
+Reglas de OData v2 en este gateway:
 
-## Paso 0 — Comprobar sesión y autologin (SIEMPRE primero)
-
-Antes de cualquier consulta, verifica que existe sesión activa. Usa la ruta base
-de la skill (`$SKILL_DIR`) obtenida de la cabecera:
-
-```powershell
-python "$SKILL_DIR\scripts\sap_connector.py" --test
-```
-
-Interpreta el resultado:
-- `Conexión OK` → continúa al Paso 1.
-- `NO_SESSION` (exit 3) o `SESSION_INVALID` (exit 4) → no hay sesión / token caducado: lanza el login.
-
-- Si responde "Conexión OK" → continúa al Paso 1.
-- Si da error de credenciales/token → **lanza automáticamente la ventana de login segura**
-  (no pidas la contraseña por el chat). En Windows, usa SIEMPRE la ruta absoluta:
-
-  ```powershell
-  Start-Process pwsh -ArgumentList '-NoProfile','-File',"$SKILL_DIR\scripts\sap_login.ps1" -Wait
-  ```
-
-  Si `pwsh` no existe, usa `powershell` en su lugar. Esto abre una ventana aparte donde
-  el usuario teclea usuario y contraseña SAP (enmascarada en la terminal, sin popup GUI).
-  Solo se guarda el token de sesión temporal; la contraseña nunca se persiste ni te llega.
-
-- Tras `-Wait`, vuelve a ejecutar `python "$SKILL_DIR\scripts\sap_connector.py" --test` para confirmar.
-  Si sigue fallando, pídele al usuario que repita el login (pudo cancelar la ventana).
-
-REGLA DE SEGURIDAD: NUNCA pidas ni aceptes la contraseña SAP escrita en el chat. El único
-canal de credenciales es la ventana de `sap_login.ps1`. Si el usuario prefiere hacerlo
-manualmente desde su propio terminal: `python "$SKILL_DIR\scripts\sap_login.py"`
-
-## Paso 1 — Entender qué datos hacen falta
-
-Lee el catálogo de servicios disponibles:
-
-```bash
-python scripts/sap_connector.py --catalog
-```
-
-El catálogo (definido en `CATALOG` dentro de `sap_connector.py`) documenta cada área de
-negocio, su servicio/entidad OData, campos útiles y notas (filtros obligatorios, etc.).
-Áreas cubiertas: **Ventas, Compras (incl. subcontratación), Stocks/MB51, Finanzas FI+CO,
-Maestros (BP, materiales)**.
-
-**EL CATÁLOGO ES LA FUENTE DE VERDAD.** Coge el `service`/`entity` y los campos directamente
-de la entrada del catálogo correspondiente. Para datos de líneas/posiciones usa
-`lines_entity` + `lines_fields` (p. ej. un pedido de compra → `A_PurchaseOrderItem`). **No
-inventes nombres de entidad ni de campo, y no llames a `sc.fields(...)` por defecto:** descargar
-los metadatos es lento y casi nunca hace falta. Reserva `sc.fields('SERVICIO','ENTIDAD')` solo
-para entidades que el catálogo marca como "ejecutar con `$top=1` para ver campos" (vistas CDS)
-o cuando una consulta falle por un campo desconocido.
-
-## Paso 2 — Construir y ejecutar la consulta (un solo proceso)
-
-**Eficiencia: una sola ejecución de Python por pregunta.** Cada invocación de `python -c` o
-`python script.py` paga arranque en frío del intérprete + nueva sesión TLS. No encadenes varias
-llamadas (una para campos, otra para datos): mete toda la lógica de la pregunta en **un único
-script** que llame a `connect()` una vez y ejecute todas las `query()` necesarias.
-
-Escribe un pequeño script Python que importe el conector y llame a `query()`:
-
-```python
-import scripts.sap_connector as sc  # o: import sap_connector as sc
-sc.connect()
-
-# Ejemplo: materiales (líneas) de un pedido de compra concreto.
-# service/entity/campos salen de COMPRAS_PEDIDOS → lines_entity / lines_fields.
-rows = sc.query(
-    'API_PURCHASEORDER_PROCESS_SRV', 'A_PurchaseOrderItem',
-    filter="PurchaseOrder eq '4500002621'",
-    select=['PurchaseOrderItem','Material','PurchaseOrderItemText',
-            'OrderQuantity','PurchaseOrderQuantityUnit','NetPriceAmount','Plant'],
-    all_pages=True,
-)
-```
-
-Para traer cabecera + líneas en **un solo viaje a SAP**, usa `$expand`:
-
-```python
-rows = sc.query('API_PURCHASEORDER_PROCESS_SRV', 'A_PurchaseOrder',
-    filter="PurchaseOrder eq '4500002621'", expand='to_PurchaseOrderItem')
-```
-
-Reglas OData v2 importantes:
 - Strings entre comillas simples: `Supplier eq '10000074'`
 - Fechas: `PostingDate ge datetime'2026-01-01T00:00:00'`
 - Texto parcial: `substringof('TELLO',SupplierFullName)`
-- `FI_ASIENTOS` exige filtro: `CompanyCode eq '1000' and LedgerFiscalYear eq '2026' and Ledger eq '0L'`
-- `$select` siempre solo los campos necesarios (reduce el payload).
-- Campos desconocidos de una entidad: como último recurso `sc.fields('SERVICIO','ENTIDAD')`
-  (lento — solo si el catálogo no los documenta).
+- `select` solo con los campos necesarios: reduce el payload y acelera la respuesta.
+- Si pides `top` y vuelven exactamente esas filas, **te has quedado corto**: OData
+  devuelve las primeras por clave, no las últimas. Acota con `filter` en vez de subir
+  el `top`, o no podrás afirmar cuál es la última.
+
+### Los dos errores que mienten sobre su causa
+
+Este gateway informa mal de dos cosas, y llevan a pedirle a Basis cambios que no hacen
+falta:
+
+| Síntoma | Causa real |
+|---|---|
+| **404**, con el cuerpo en alemán | Un campo de `$select` **no existe** en la entidad. No es que el servicio esté desactivado. |
+| **403** | El **servicio no existe** en este sistema. No es falta de autorización. |
+
+Para distinguirlo en un intento: **repite la consulta sin `select`**. Si devuelve datos,
+el servicio está activo y autorizado y el problema es un nombre de campo. El conector ya
+traduce este caso y te dirá qué campo falla y cuáles son válidos.
+
+Ejemplo real: `A_PurchaseOrder` **no tiene importe de cabecera**.
+`PurchaseOrderNetAmount` y `NetAmount` dan 404; los importes están en
+`A_PurchaseOrderItem`.
 
 ## Paso 3 — Responder
 
-- Presenta los datos en tabla markdown, destaca totales y patrones.
-- Convierte unidades si procede (las conversiones CS/UN/KG están en `A_ProductUnitsOfMeasure`
-  del material; QuantityNumerator/QuantityDenominator).
-- Habla como analista de negocio, no menciones detalles técnicos de la query salvo que lo pidan.
+- Tabla markdown, con totales y patrones destacados.
+- Convierte unidades si procede: las conversiones CS/UN/KG están en
+  `A_ProductUnitsOfMeasure` del material (`QuantityNumerator`/`QuantityDenominator`).
+- Habla como analista de negocio. No menciones detalles técnicos de la consulta salvo
+  que los pidan.
 
 ## Paso 4 — Dashboards HTML (si lo piden)
 
-Cuando el usuario pida un dashboard, informe visual o algo "para enseñar a compañeros",
-sigue la guía completa en **`references/dashboard-html.md`**: fichero HTML autocontenido
-con Chart.js vía CDN, datos embebidos (sin dependencia de SAP al abrir), KPIs + gráficos +
-tabla de detalle. Guárdalo y ábrelo con `Start-Process fichero.html`.
+Cuando pidan un dashboard, informe visual o algo «para enseñar a compañeros», sigue
+**`references/dashboard-html.md`**: HTML autocontenido, Chart.js por CDN, datos
+embebidos (que no dependa de SAP al abrirlo), KPIs + gráficos + tabla de detalle.
 
 ## Notas de acceso
 
 - Las APIs transaccionales standard (`API_*`) y las vistas `ZVCDS*_CDS` están accesibles.
-- Algunos APIs FI/CO sueltos (Billing, GL Line Items, Cost Center API propia) dan 403:
-  usa `API_JOURNALENTRYITEMBASIC_SRV` (Universal Journal) para FI+CO, y `ZVCDS_VBRP_CDS`
-  para facturas de venta.
-- Requiere VPN de Heura activa.
+- Algunos APIs FI/CO sueltos (Billing, GL Line Items, Cost Center API propia) no existen
+  aquí y devuelven 403: usa `API_JOURNALENTRYITEMBASIC_SRV` (Universal Journal) para
+  FI+CO, y `ZVCDS_VBRP_CDS` para facturas de venta.
+- El hub solo es alcanzable desde la red de Heura o con la SSL-VPN conectada.
+
+## Break-glass: los scripts locales
+
+`scripts/sap_connector.py` y `scripts/sap_login.py` permiten hablar con SAP **sin pasar
+por el hub**, ejecutándose en el equipo del usuario. Solo para cuando el hub esté caído
+y con conocimiento de causa, porque:
+
+- Usan **las credenciales SAP de quien los ejecute**, no las del hub: los permisos y por
+  tanto los resultados pueden ser distintos.
+- No dejan traza en el registro de auditoría del hub.
+- Exigen VPN y Python con dependencias en el equipo.
+
+Si acabas usándolos, dilo explícitamente en la respuesta para que el usuario sepa que ese
+dato no vino por el camino normal.
