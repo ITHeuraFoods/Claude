@@ -36,7 +36,12 @@ try {
     $lnk = $wsh.CreateShortcut($shortcut)
     $lnk.TargetPath       = "powershell.exe"
     $lnk.Arguments        = "-ExecutionPolicy Bypass -Command `"& { `$env:HEURA_REGISTER_SECRET='$RegisterSecret'; `$env:HEURA_MCP_URL='http://mcp.heurafoods.com:3003'; $pythonCmd '$loginScript' }; pause`""
-    $lnk.WorkingDirectory = "C:\heura-mcp"
+    # El directorio de trabajo debe ser el del propio script. Antes apuntaba a
+    # C:\heura-mcp, que es la ruta del hub VIEJO y ya no contiene el login. En
+    # equipos donde ahi quedaron restos de un entorno Python (un Lib\), el
+    # interprete los tomaba por su propia instalacion y moria con
+    # "ModuleNotFoundError: No module named 'encodings'".
+    $lnk.WorkingDirectory = $loginDir
     $lnk.IconLocation     = "shell32.dll,144"
     $lnk.Description      = "Conectar cuenta M365 con Claude"
     $lnk.Save()
