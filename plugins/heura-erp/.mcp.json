@@ -7,6 +7,10 @@
     "graph-heura-remote": {
       "type": "http",
       "url": "http://mcp.heurafoods.com:3002/mcp"
+    },
+    "odoo-heura-remote": {
+      "type": "http",
+      "url": "http://mcp.heurafoods.com:3004/mcp"
     }
   }
 }

@@ -58,6 +58,14 @@ if (Test-Path $uc) {
         if ($srv.headers.Authorization) {
             Reporta $ok "~/.claude.json tiene los servidores CON token"
             $tieneToken = $true
+            # El de Odoo llego despues (2026-09-14) y no lo tiene quien se
+            # registro antes; lo anade el script de usuario de Intune.
+            $faltan = @('sap-heura-remote','odoo-heura-remote') |
+                      Where-Object { -not $c.mcpServers.$_.headers.Authorization }
+            if ($faltan) {
+                Reporta $wr "faltan servidores en ~/.claude.json: $($faltan -join ', ')"
+                $problemas += "Volver a lanzar el script de usuario de Intune, o el acceso directo de login"
+            }
         } else {
             Reporta $ko "~/.claude.json tiene los servidores pero SIN token"
             $problemas += "Ejecutar el acceso directo 'Conectar M365 con Claude'"
@@ -88,12 +96,21 @@ try {
     Reporta $ko "mcp.heurafoods.com NO resuelve"
     $problemas += "Problema de DNS"
 }
-$tcp = Test-NetConnection mcp.heurafoods.com -Port 3002 -InformationLevel Quiet -WarningAction SilentlyContinue
-if ($tcp) {
-    Reporta $ok "el hub responde en el puerto 3002"
-} else {
-    Reporta $ko "NO se alcanza el hub en el 3002"
+$puertos = @{ 3001 = "SAP"; 3002 = "M365"; 3004 = "Odoo" }
+$caidos = @()
+foreach ($p in ($puertos.Keys | Sort-Object)) {
+    if (Test-NetConnection mcp.heurafoods.com -Port $p -InformationLevel Quiet -WarningAction SilentlyContinue) {
+        Reporta $ok "el hub responde en el $p ($($puertos[$p]))"
+    } else {
+        Reporta $ko "NO se alcanza el hub en el $p ($($puertos[$p]))"
+        $caidos += $p
+    }
+}
+if ($caidos.Count -eq $puertos.Count) {
     $problemas += "Conectar la VPN de Heura (FortiClient) y reintentar"
+} elseif ($caidos.Count -gt 0) {
+    # Si unos responden y otros no, no es la red del usuario: es el hub.
+    $problemas += "Avisar a IT: el hub no escucha en $($caidos -join ', ') (servicio parado o puerto sin abrir en el FortiGate)"
 }
 
 # 6. Python, que necesita el script de login

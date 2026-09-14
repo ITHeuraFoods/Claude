@@ -5,99 +5,107 @@ description: Consulta Odoo (ERP de Heura) en lenguaje natural. Úsala cuando el 
 
 # Odoo Heura — Consultas en lenguaje natural
 
-Esta skill conecta con Odoo (https://erp.heurafoods.com) vía JSON-RPC y permite responder
-preguntas de negocio con datos reales, y generar dashboards HTML.
+Esta skill consulta Odoo (`https://erp.heurafoods.com`) a través del MCP
+**`odoo-heura-remote`**, que corre en el hub de Heura y habla JSON-RPC con el ERP.
 
-## Ubicación de los scripts
+## Cómo se consulta
 
-Los scripts están en la carpeta `scripts/` dentro del directorio de esta skill
-(el mismo directorio donde se encuentra este `SKILL.md`). Ejecuta los comandos
-desde ese directorio base o usa rutas absolutas a `scripts/odoo_connector.py`
-y `scripts/odoo_login.ps1`.
+**Usa siempre las tools del MCP `odoo-heura-remote`.** No ejecutes Python en el equipo
+del usuario para hablar con Odoo.
 
-## Paso 0 — Comprobar sesión y autologin (SIEMPRE primero)
+| Tool | Para qué |
+|---|---|
+| `catalogo_odoo()` | Áreas de negocio, modelos y campos útiles. **Empieza aquí.** |
+| `query_odoo(model, domain, fields, limit, order)` | Traer registros (`search_read`) |
+| `count_odoo(model, domain)` | Cuántos hay, sin traerlos |
+| `fields_odoo(model, filtro)` | Campos de un modelo, cuando el catálogo no llega |
 
-Antes de cualquier consulta, verifica que existe sesión activa:
+El MCP es de **solo lectura**: no hay forma de crear ni modificar nada en Odoo desde
+aquí, por diseño. Si alguien pide un cambio en Odoo, dile que lo haga en la aplicación.
 
-```bash
-python scripts/odoo_connector.py --test
-```
+**No hay que iniciar sesión.** El hub guarda la única cuenta de Odoo de la organización;
+el usuario no tiene que dar credenciales nunca. Si alguien te ofrece su contraseña de
+Odoo, no la aceptes ni la uses.
 
-Interpreta el resultado:
-- `Conexión OK` → continúa al Paso 1.
-- `NO_SESSION` (exit 3) o `SESSION_INVALID` (exit 4) → no hay sesión / token caducado:
-  **lanza automáticamente la ventana de login segura** (no pidas la contraseña por el chat):
+**Si `odoo-heura-remote` no aparece o no responde**, dile al usuario que conecte la VPN
+de Heura (FortiClient) y lo reintente; el hub no se alcanza desde fuera. Si persiste, que
+ejecute el diagnóstico que le pasará IT. No intentes suplirlo con los scripts locales:
+ver la sección final.
 
-  ```powershell
-  Start-Process pwsh -ArgumentList '-NoProfile','-File','scripts/odoo_login.ps1' -Wait
-  ```
+## Odoo o SAP: cuál tiene el dato
 
-  Si `pwsh` no existe, usa `powershell`. Abre una ventana aparte con un diálogo seguro de
-  Windows donde el usuario teclea usuario (email) y contraseña Odoo. Solo se guarda el cookie
-  `session_id`; la contraseña nunca se persiste ni te llega. Tras `-Wait`, repite `--test`.
+Los dos ERP conviven y contienen cosas distintas:
 
-REGLA DE SEGURIDAD: NUNCA pidas ni aceptes la contraseña Odoo escrita en el chat. El único
-canal de credenciales es la ventana de `odoo_login.ps1`. (Alternativa manual en terminal del
-usuario: `python scripts/odoo_login.py`.)
+- **Hasta el 29/02/2024** la contabilidad está en **Odoo**.
+- **Desde marzo de 2024** está en **SAP** (skill `sap-heura`).
 
-## Paso 1 — Entender qué datos hacen falta
+Si la pregunta cruza esa fecha, hay que consultar los dos y decirlo en la respuesta. Si
+no está claro en qué sistema vive el dato, pregunta antes de dar una cifra: responder
+con medio ejercicio es peor que preguntar.
 
-Lee el catálogo de modelos disponibles:
+## Paso 1 — Elegir modelo
 
-```bash
-python scripts/odoo_connector.py --catalog
-```
+Llama a `catalogo_odoo()`. Cubre **Compras, Ventas, Facturación/Contabilidad, Stock y
+Maestros**. **El catálogo es la fuente de verdad**: coge de ahí el `model` y los campos.
+No inventes nombres de campo; si el que necesitas no está, usa `fields_odoo`.
 
-El catálogo (`CATALOG` dentro de `odoo_connector.py`) documenta cada área, su modelo Odoo,
-campos útiles y notas. Áreas: **Compras, Ventas, Facturación/Contabilidad, Stock, Maestros**.
+## Paso 2 — Construir la consulta
 
-**EL CATÁLOGO ES LA FUENTE DE VERDAD.** Coge el `model` y los campos de la entrada
-correspondiente. No inventes nombres de campo. Para descubrir campos de un modelo concreto,
-como último recurso usa `oc.fields_of('modelo')` (puede ser lento).
+Reglas de dominio Odoo:
 
-## Paso 2 — Construir y ejecutar la consulta (un solo proceso)
-
-**Eficiencia: una sola ejecución de Python por pregunta.** Mete toda la lógica en un único
-script que llame a `connect()` una vez y ejecute todas las `query()` necesarias.
-
-```python
-import scripts.odoo_connector as oc  # o: import odoo_connector as oc
-oc.connect()
-
-# Ejemplo: compras del producto 100020 al proveedor Tello
-# 1) localizar el partner correcto (ilike puede devolver varios homónimos)
-tello = oc.query('res.partner', domain=[['name','=','INDUSTRIAS CARNICAS TELLO S.A.']],
-                 fields=['id','name'], limit=1)
-pid = tello[0]['id']
-# 2) líneas de compra (partner_id existe también en la línea)
-lineas = oc.query('purchase.order.line',
-    domain=[['partner_id','=',pid], ['product_id.default_code','=','100020']],
-    fields=['product_qty','qty_received','price_subtotal','product_uom'],
-    all_pages=True)
-```
-
-Reglas de dominio Odoo (filtros):
-- Lista de tuplas: `[['campo','operador',valor], ...]` (varias condiciones = AND).
+- Lista de condiciones en JSON: `[["campo","operador",valor], ...]` (varias = AND).
 - Operadores: `=`, `!=`, `>`, `>=`, `<`, `<=`, `in`, `not in`, `like`, `ilike`, `child_of`.
-- OR explícito con notación polaca: `['|', ['a','=',1], ['b','=',2]]`.
-- Campos relacionales con punto: `product_id.default_code`, `order_id.partner_id`.
-- Fechas como string ISO: `['date_order','>=','2024-01-01']`.
-- Campos Many2one se devuelven como `[id, "nombre"]`.
+- OR explícito, notación polaca: `["|",["a","=",1],["b","=",2]]`.
+- Relacionales con punto: `product_id.default_code`, `order_id.partner_id`.
+- Fechas como texto ISO: `["date_order",">=","2024-01-01"]`.
+- Los campos Many2one vuelven como `[id, "nombre"]`.
+- Pide solo los `fields` que necesites: sin ellos vuelve el registro entero.
+- Si vuelven exactamente las filas del `limit`, **te has quedado corto**: acota el
+  `domain` en vez de subir el `limit`, o no podrás afirmar cuál es el último.
 
-Notas de negocio importantes:
-- `account.move.move_type`: `out_invoice`=factura cliente, `in_invoice`=factura proveedor,
-  `out_refund`/`in_refund`=abonos. `payment_state` y `amount_residual` para cobros/pagos.
-- En Heura hay pedidos ES (ESPO…) y FR (FRPO…); filtra por `company_id` o por el prefijo de
-  `name` si el usuario pregunta por una sociedad concreta.
-- `purchase.order.line`: `product_qty`=pedido, `qty_received`=recibido, `qty_invoiced`=facturado.
-  `price_subtotal`=sin IVA, `price_total`=con IVA.
+Buscar un partner por nombre suele devolver homónimos. Localízalo primero y quédate con
+el `id`:
+
+```
+query_odoo("res.partner", domain='[["name","ilike","TELLO"]]', fields="id,name,vat", limit=10)
+query_odoo("purchase.order.line",
+           domain='[["partner_id","=",1079],["product_id.default_code","=","100020"]]',
+           fields="product_qty,qty_received,price_subtotal,product_uom")
+```
+
+## Normas de negocio (convenciones Heura — aplícalas SIEMPRE)
+
+- `account.move.move_type`: `out_invoice`=factura cliente, `in_invoice`=factura
+  proveedor, `out_refund`/`in_refund`=abonos, `entry`=asiento.
+  `payment_state` y `amount_residual` para pendiente de cobro/pago.
+- Hay pedidos **ES** (`ESPO…`) y **FR** (`FRPO…`): filtra por `company_id` o por el
+  prefijo de `name` si preguntan por una sociedad concreta.
+- `purchase.order.line`: `product_qty`=pedido, `qty_received`=recibido,
+  `qty_invoiced`=facturado. `price_subtotal`=sin IVA, `price_total`=con IVA.
+- `default_code` es la referencia interna del producto (p. ej. `100020`).
+- **Nunca pidas ni aceptes la contraseña de Odoo por el chat.**
 
 ## Paso 3 — Responder
 
-- Presenta los datos en tabla markdown, destaca totales y patrones.
-- Habla como analista de negocio; no menciones detalles técnicos de la query salvo que lo pidan.
+- Tabla markdown, con totales y patrones destacados.
+- Habla como analista de negocio. No menciones detalles técnicos de la consulta salvo
+  que los pidan.
 
 ## Paso 4 — Dashboards HTML (si lo piden)
 
-Sigue la guía en **`references/dashboard-html.md`**: HTML autocontenido con Chart.js vía CDN,
-datos embebidos, KPIs + gráficos + tabla. Ábrelo con `Start-Process fichero.html`.
+Sigue **`references/dashboard-html.md`**: HTML autocontenido, Chart.js por CDN, datos
+embebidos (que no dependa de Odoo al abrirlo), KPIs + gráficos + tabla de detalle.
+
+## Break-glass: los scripts locales
+
+`scripts/odoo_connector.py` y `scripts/odoo_login.ps1` hablan con Odoo **sin pasar por el
+hub**, desde el equipo del usuario. Solo para cuando el hub esté caído, y con
+conocimiento de causa:
+
+- Exigen que el usuario teclee las credenciales de la cuenta compartida en la ventana de
+  login, que es justo lo que la migración al hub vino a eliminar.
+- No dejan traza en el registro de auditoría del hub.
+- Exigen Python con dependencias en el equipo.
+
+Si acabas usándolos, dilo explícitamente en la respuesta para que el usuario sepa que ese
+dato no vino por el camino normal.

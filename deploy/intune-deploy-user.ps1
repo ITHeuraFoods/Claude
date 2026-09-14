@@ -66,6 +66,63 @@ try {
         Write-Output "AVISO: no hay Python en $pythonAbs; el login no funcionara."
     }
 
+    # ── Servidores MCP nuevos para quien ya hizo login ───────────────────────
+    # El token que emite /register no es por servicio: identifica a la persona y
+    # vale para los tres MCP. Asi que cuando se anade un servidor al hub (Odoo,
+    # 2026-09-14) no hay que hacer que 30 personas repitan el login: basta con
+    # copiar el token que ya tienen a la entrada nueva de ~/.claude.json.
+    # Quien aun no se haya registrado no se ve afectado: el script de login ya
+    # crea los tres.
+    $uc = "$env:USERPROFILE\.claude.json"
+    $nuevos = @{ "odoo-heura-remote" = "http://mcp.heurafoods.com:3004/mcp" }
+    if (Test-Path $uc) {
+        try {
+            $cfg = Get-Content $uc -Raw -Encoding UTF8 | ConvertFrom-Json
+            $tok = $cfg.mcpServers.'graph-heura-remote'.headers.Authorization
+            if ($tok) {
+                $anadidos = 0
+                foreach ($n in $nuevos.Keys) {
+                    if (-not $cfg.mcpServers.$n) {
+                        $cfg.mcpServers | Add-Member -NotePropertyName $n -NotePropertyValue ([pscustomobject]@{
+                            type    = "http"
+                            url     = $nuevos[$n]
+                            headers = [pscustomobject]@{ Authorization = $tok }
+                        })
+                        $anadidos++
+                    }
+                }
+                if ($anadidos -gt 0) {
+                    Copy-Item $uc "$uc.bak" -Force
+                    # -Depth 100 (el maximo) NO es por exceso: ~/.claude.json
+                    # guarda el historial por proyecto y ConvertTo-Json trunca
+                    # en silencio lo que pase de la profundidad pedida. Truncar
+                    # aqui seria cargarse la configuracion de la persona.
+                    $json = $cfg | ConvertTo-Json -Depth 100
+                    Set-Content $uc -Value $json -Encoding UTF8
+                    # Verificar que lo escrito sigue siendo valido y completo;
+                    # si no, volver atras y no tocar nada.
+                    $sano = $false
+                    try {
+                        $rl = Get-Content $uc -Raw -Encoding UTF8 | ConvertFrom-Json
+                        $sano = [bool]$rl.mcpServers.'graph-heura-remote'.headers.Authorization
+                    } catch { $sano = $false }
+                    if ($sano) {
+                        Write-Output "Anadidos $anadidos servidor(es) MCP nuevos reutilizando el token existente."
+                    } else {
+                        Copy-Item "$uc.bak" $uc -Force
+                        Write-Output "AVISO: la escritura de ~/.claude.json no quedo sana; restaurado el respaldo. El usuario tendra que lanzar el acceso directo de login."
+                    }
+                } else {
+                    Write-Output "No hay servidores MCP nuevos que anadir."
+                }
+            } else {
+                Write-Output "El usuario aun no tiene token; lo creara el acceso directo de login."
+            }
+        } catch {
+            Write-Output "AVISO: no se pudo actualizar ~/.claude.json ($_)."
+        }
+    }
+
     # ── Refrescar el marketplace de Heura ────────────────────────────────────
     # No nos fiamos de autoUpdate: el 2026-09-10 un clon llevaba 11 commits de
     # retraso pese a varios reinicios de Claude. Como el clon es un repo git

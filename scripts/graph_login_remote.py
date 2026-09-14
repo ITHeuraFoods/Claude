@@ -39,7 +39,8 @@ SCOPES    = ["Mail.Send", "Mail.ReadWrite", "Calendars.ReadWrite",
 MCP_HOST     = os.environ.get("HEURA_MCP_HOST", "mcp.heurafoods.com")
 REGISTER_URL = os.environ.get("HEURA_MCP_URL", f"http://{MCP_HOST}:3003")
 SERVERS      = {"sap-heura-remote":   f"http://{MCP_HOST}:3001/mcp",
-                "graph-heura-remote": f"http://{MCP_HOST}:3002/mcp"}
+                "graph-heura-remote": f"http://{MCP_HOST}:3002/mcp",
+                "odoo-heura-remote":  f"http://{MCP_HOST}:3004/mcp"}
 
 SECRET = os.environ.get("HEURA_REGISTER_SECRET", "")
 
