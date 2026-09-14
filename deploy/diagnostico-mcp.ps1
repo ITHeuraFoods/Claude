@@ -14,8 +14,18 @@ Write-Host "Usuario: $env:USERNAME   Equipo: $env:COMPUTERNAME"
 Write-Host ""
 
 # 1. Politica de organizacion (la despliega intune-deploy-system.ps1)
-$managed = "C:\ProgramData\ClaudeCode\managed-settings.json"
-if (Test-Path $managed) {
+# La ruta buena es Program Files; ProgramData es la legacy, sin soporte desde
+# Claude Code v2.1.75, y en equipos antiguos puede quedar ahi un fichero viejo.
+# Se miran las dos: buscar solo en ProgramData daba un FALLA falso en equipos
+# correctamente desplegados.
+$managed = @("C:\Program Files\ClaudeCode\managed-settings.json",
+             "C:\ProgramData\ClaudeCode\managed-settings.json") |
+           Where-Object { Test-Path $_ } | Select-Object -First 1
+if ($managed) {
+    if ($managed -like "C:\ProgramData\*") {
+        Reporta $wr "managed-settings.json solo en la ruta legacy ($managed)"
+        $problemas += "Volver a desplegar intune-deploy-system.ps1 (instala en Program Files)"
+    }
     $m = Get-Content $managed -Raw | ConvertFrom-Json
     if ($m.enabledPlugins.'heura-erp@heura') {
         Reporta $ok "managed-settings.json presente y con heura-erp activado"
@@ -24,7 +34,7 @@ if (Test-Path $managed) {
         $problemas += "Volver a desplegar intune-deploy-system.ps1"
     }
 } else {
-    Reporta $ko "NO existe $managed"
+    Reporta $ko "NO existe managed-settings.json en Program Files\ClaudeCode"
     $problemas += "Falta el script de sistema de Intune (intune-deploy-system.ps1)"
 }
 

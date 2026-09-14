@@ -10,6 +10,10 @@ desactivar localmente.
 | Fichero | Propósito |
 |---------|-----------|
 | `managed-settings.json` | Instala el marketplace y activa el plugin `heura-erp` |
+| `intune-deploy-system.ps1` | Script SYSTEM: `managed-settings.json`, `C:\heura-mcp\graph_login_remote.py` y fuentes |
+| `intune-deploy-user.ps1` | Script de usuario: acceso directo de login, dependencias de Python, refresco del marketplace y alta de MCP nuevos |
+| `intune-wrapper-user.ps1` | Envoltorio local del anterior. **Gitignored: lleva el secreto de registro** |
+| `diagnostico-mcp.ps1` | Diagnóstico de «no me aparecen los MCP». Solo lee, no cambia nada |
 | `install-fonts.ps1` | Instala las fuentes corporativas Heura y Pixel Grafiti |
 | `fonts/Heura.ttf` | Fuente custom brand (headings) — **añadir manualmente** |
 | `fonts/Pixel-Grafiti.ttf` | Fuente decorativa custom — **añadir manualmente** |
@@ -46,9 +50,22 @@ desactivar localmente.
 
 ## Verificación
 
-Tras el despliegue, en un equipo cualquiera el usuario debería ver el plugin `heura-erp`
-ya instalado y activo (las skills `sap-heura` y `odoo-heura` disponibles) sin haber ejecutado
-ningún comando.
+En un equipo cualquiera, el usuario debería ver el plugin `heura-erp` instalado y activo
+(skills `sap-heura`, `odoo-heura` y `m365-heura`) sin haber ejecutado ningún comando.
+
+Para que además funcionen los MCP hace falta que la persona haya ejecutado **una vez** el
+acceso directo «Conectar M365 con Claude» del escritorio: es lo que obtiene su token. Quien
+ya lo hizo no tiene que repetirlo cuando se añade un MCP nuevo — el script de usuario copia
+su token a la entrada nueva.
+
+```powershell
+Test-NetConnection mcp.heurafoods.com -Port 3001   # SAP
+Test-NetConnection mcp.heurafoods.com -Port 3002   # M365
+Test-NetConnection mcp.heurafoods.com -Port 3004   # Odoo
+```
+
+**El hub solo se alcanza desde la red de Heura o con la SSL-VPN conectada.** Si fallan los
+tres, es la VPN. Si falla solo uno, es el hub: avisar a IT.
 
 ## Troubleshooting en un equipo
 
@@ -59,13 +76,25 @@ Comprobar en este orden:
 3. Existe `C:\Program Files\ClaudeCode\managed-settings.json` — si no, el script SYSTEM no
    ha corrido o falló (ver log 1).
 4. Existe `C:\heura-mcp\graph_login_remote.py` — necesario para el login M365.
-5. `Test-NetConnection 172.6.2.2 -Port 3002` — el MCP hub se alcanza por IP fija, tanto en
-   la LAN de oficina como por SSL-VPN (ver `fortinet-vpn-mcp-access.md` en el repo privado
-   `ITHeuraFoods/Claude-docs`). El hostname
-   `laptop-itadm` NO resuelve en los laptops (solo vía Tailscale del equipo de IT); por eso
-   el `.mcp.json` del plugin usa la IP.
-6. En Claude Code: `/plugin` para ver si `heura-erp@heura` está instalado y `/mcp` para el
-   estado de `graph-heura-remote` y `sap-heura-remote`.
+5. `~/.claude.json` tiene los servidores **con token**. Es el fichero que Claude Code lee de
+   verdad para los MCP de ámbito usuario; un bloque `mcpServers` en `~/.claude/settings.json`
+   se queda inerte.
+6. `Test-NetConnection mcp.heurafoods.com -Port 3002` — con VPN o en la oficina.
+7. Python 3.12 en `C:\Program Files\Python312` con `msal` y `requests`. Si falta
+   `Lib\os.py`, la instalación está rota y el síntoma engaña: `ModuleNotFoundError: No
+   module named 'encodings'`, que no tiene nada que ver con las dependencias. Se arregla con
+   Aplicaciones → Python 3.12 → Modificar → Repair.
+8. En Claude Code: `/plugin` para ver si `heura-erp@heura` está instalado.
+
+**Atajo: `deploy/diagnostico-mcp.ps1` comprueba los ocho puntos de golpe** y dice qué hacer,
+en orden. Solo lee:
+
+```powershell
+irm https://raw.githubusercontent.com/ITHeuraFoods/Claude/main/deploy/diagnostico-mcp.ps1 | iex
+```
+
+Tras cualquier arreglo hay que **cerrar Claude del todo y volver a abrirlo**: la
+configuración de MCP se lee al arrancar.
 
 ## Nota
 

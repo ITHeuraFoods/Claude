@@ -6,7 +6,7 @@ Marketplace interno de Heura Foods. Contiene los plugins de Claude Code que usa 
 
 | Plugin | Descripción |
 |--------|-------------|
-| `heura-erp` | Consultas en lenguaje natural a SAP S/4HANA y Odoo + dashboards. Incluye las normas de negocio internas. |
+| `heura-erp` | Consultas en lenguaje natural a SAP S/4HANA, Odoo y M365 + dashboards. Incluye las normas de negocio internas. |
 | `heura-brand` | Directrices de marca para presentaciones y documentos. Incluye `heura-brand-deck` (brand Heura 2026 en cualquier presentación `.pptx`) y `heura-brand-doc` (plantilla Word oficial de Heura para cualquier `.doc`/`.docx`). |
 
 ## Instalación (usuario individual)
@@ -22,25 +22,33 @@ Para actualizar cuando se publiquen cambios:
 /plugin update heura-erp@heura heura-brand@heura
 ```
 
-## Prerequisito de seguridad — Autenticación delegada por usuario
+## Cómo accede el plugin a SAP, M365 y Odoo
 
-> ⚠️ **OBLIGATORIO antes del despliegue org-wide.**
+Los tres ERP se consultan a través de servidores **MCP centralizados** que corren en el hub
+de Heura, no ejecutando scripts en el equipo de cada persona.
 
-El MCP Hub debe autenticar cada llamada a SAP y Odoo con la identidad real del usuario,
-no con una cuenta de servicio compartida. Sin esto, todos los usuarios de la IA verían
-los datos con los permisos de la cuenta de servicio, ignorando los roles SAP/Odoo de
-cada persona.
+| MCP | Sistema | Identidad |
+|---|---|---|
+| `sap-heura-remote` | SAP S/4HANA (PS4) | Cuenta de servicio |
+| `graph-heura-remote` | M365: correo, calendario, Teams, OneDrive, To Do | **La de cada persona** |
+| `odoo-heura-remote` | Odoo | Cuenta compartida única. Solo lectura |
 
-Ver documentación técnica completa en el repo privado
-[`ITHeuraFoods/Claude-docs`](https://github.com/ITHeuraFoods/Claude-docs) →
-`delegated-auth-architecture.md` (acceso: equipo de IT).
+Cada llamada exige un token bearer que identifica a quien pregunta, y queda registrada. El
+token lo emite el hub tras un login real contra Entra: es lo que hace el acceso directo
+**«Conectar M365 con Claude»** del escritorio, que solo hay que ejecutar una vez.
 
-**Resumen de tareas (Basis + IT + Dev, ~3-4 semanas):**
-- Basis: configurar SAP IAS federado con Azure AD + activar OAuth 2.0 en SAP (`SOAUTH2`)
-- IT: registrar la aplicación en Azure AD con scopes Graph API
-- Dev: implementar Token Exchange (RFC 8693) en el backend del MCP Hub
-- IT: generar API keys Odoo por usuario y almacenarlas en Key Vault
-- Dev+Basis: testing con usuarios piloto de distintos perfiles
+**El hub solo es alcanzable desde la red de Heura o con la SSL-VPN conectada.** Si los MCP
+no aparecen, lo primero es comprobar la VPN; después, el diagnóstico de `deploy/`.
+
+Documentación técnica en el repo privado
+[`ITHeuraFoods/Claude-docs`](https://github.com/ITHeuraFoods/Claude-docs) (acceso: IT).
+
+### Pendiente: identidad por usuario en SAP
+
+Hoy SAP se consulta con una cuenta de servicio, así que los permisos que aplica son los de
+esa cuenta, no los roles de cada persona. Es trabajo de mejora conocido, no un bloqueante
+del despliegue. En Odoo no aplica: solo existe una cuenta. Ver
+`delegated-auth-architecture.md` en el repo privado.
 
 ---
 
