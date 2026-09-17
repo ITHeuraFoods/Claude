@@ -40,6 +40,11 @@ SITES_SCOPES        = SCOPES + ["Sites.Read.All"]                      # sitios 
 PLACES_SCOPES       = SCOPES + ["Place.Read.All"]                      # salas
 TEAMS_SCOPES        = SCOPES + ["Team.ReadBasic.All", "Channel.ReadBasic.All"]
 CHANNEL_READ_SCOPES = TEAMS_SCOPES + ["ChannelMessage.Read.All"]
+# Buzones delegados (shared inbox). Solo se piden cuando la tool apunta a un buzon que NO es
+# el propio: asi quien solo usa el suyo no necesita volver a consentir nada. Exchange sigue
+# decidiendo quien entra donde: estos scopes no dan acceso, solo permiten pedirlo.
+SHARED_SCOPES         = SCOPES + ["Mail.ReadWrite.Shared", "Mail.Send.Shared"]
+SHARED_MAILBOX_SCOPES = MAILBOX_SCOPES + ["Mail.ReadWrite.Shared", "Mail.Send.Shared"]
 TZ_MADRID = "Europe/Madrid"
 TOKEN_DIR = os.environ.get("HEURA_TOKEN_DIR", r"C:\heura-mcp\m365_tokens")
 GRAPH     = "https://graph.microsoft.com/v1.0"
@@ -118,6 +123,27 @@ _MAX_INLINE_MB = 3.0      # adjunto incrustado en la propia peticion (limite de 
 _MAX_ATTACH_MB = 150.0    # con sesion de subida por trozos (limite de Outlook)
 _CHUNK = 10 * 327680      # 3,2 MB: Graph exige multiplos de 320 KiB
 _PREFER_TZ = {"Prefer": f'outlook.timezone="{TZ_MADRID}"'}
+
+
+def _mbx(user_email: str, mailbox: str = "") -> str:
+    """Base de las rutas de correo: /me para el buzon propio, /users/{upn} para uno delegado.
+
+    Ojo: /me NO es intercambiable con /users/{el propio upn}. Se deja /me por defecto para no
+    cambiar el comportamiento de quien no pasa mailbox, y porque /me no exige los scopes .Shared.
+    """
+    m = (mailbox or "").strip()
+    if not m or m.lower() == (user_email or "").strip().lower():
+        return "/me"
+    return "/users/" + m
+
+
+def _mbx_scopes(user_email: str, mailbox: str = "", base_scopes: list | None = None) -> list | None:
+    """Scopes de la llamada: los .Shared solo si el buzon es ajeno. None = los de siempre."""
+    if _mbx(user_email, mailbox) == "/me":
+        return base_scopes
+    if base_scopes is MAILBOX_SCOPES:
+        return SHARED_MAILBOX_SCOPES
+    return SHARED_SCOPES
 
 
 def _recipients(csv: str) -> list:
@@ -258,13 +284,16 @@ def _upload_chunks(upload_url: str, data: bytes) -> dict:
     return last
 
 
-def _attach_to_message(user_email: str, message_id: str, items: list) -> None:
+def _attach_to_message(user_email: str, message_id: str, items: list,
+                       base: str = "/me", scopes: list | None = None) -> None:
     """Adjunta a un borrador: incrustado si cabe, sesion de subida si no."""
     for it in items:
         if len(it["data"]) <= _MAX_INLINE_MB * _MB:
-            _call("POST", f"/me/messages/{message_id}/attachments", user_email, json=_inline_item(it))
+            _call("POST", f"{base}/messages/{message_id}/attachments", user_email, scopes=scopes,
+                  json=_inline_item(it))
         else:
-            sess = _call("POST", f"/me/messages/{message_id}/attachments/createUploadSession", user_email,
+            sess = _call("POST", f"{base}/messages/{message_id}/attachments/createUploadSession", user_email,
+                         scopes=scopes,
                          json={"AttachmentItem": {"attachmentType": "file", "name": it["name"],
                                                   "size": len(it["data"]),
                                                   "contentType": it.get("content_type") or "application/octet-stream"}})
@@ -310,10 +339,12 @@ def _message(to, subject, body, body_type, cc, bcc):
 @mcp.tool()
 def send_email(user_email: str, to: str, subject: str, body: str,
                body_type: str = "HTML", cc: str = "", bcc: str = "",
-               attachments: list | None = None, send_at: str = "") -> dict:
+               attachments: list | None = None, send_at: str = "", mailbox: str = "") -> dict:
     """
     Envía un email NUEVO en nombre del usuario.
     - user_email: email M365 del remitente (ej: ana@heurafoods.com)
+    - mailbox: (opcional) buzón compartido desde el que enviar (ej: pedidos@heurafoods.com).
+      Vacío = el buzón propio. Exige "Enviar como" o "Enviar en nombre de" en Exchange.
     - to / cc / bcc: destinatarios separados por coma (cc y bcc opcionales)
     - body_type: 'HTML' o 'Text'
     - attachments: (opcional) lista de adjuntos, cada uno
@@ -325,25 +356,27 @@ def send_email(user_email: str, to: str, subject: str, body: str,
       Exchange retiene el correo y lo envía a esa hora aunque Claude ya no esté abierto.
     Para responder a un correo existente usa reply_email, no send_email: si no, rompes el hilo.
     """
+    base, sc = _mbx(user_email, mailbox), _mbx_scopes(user_email, mailbox)
     items = _collect_attachments(user_email, attachments)
     msg = _message(to, subject, body, body_type, cc, bcc)
     if not send_at and _fits_inline(items):
         if items:
             msg["attachments"] = [_inline_item(it) for it in items]
-        _call("POST", "/me/sendMail", user_email, json={"message": msg})
+        _call("POST", f"{base}/sendMail", user_email, scopes=sc, json={"message": msg})
     else:
         msg.update(_deferred(send_at))
-        draft = _call("POST", "/me/messages", user_email, json=msg)
-        _attach_to_message(user_email, draft["id"], items)
-        _call("POST", f"/me/messages/{draft['id']}/send", user_email)
+        draft = _call("POST", f"{base}/messages", user_email, scopes=sc, json=msg)
+        _attach_to_message(user_email, draft["id"], items, base, sc)
+        _call("POST", f"{base}/messages/{draft['id']}/send", user_email, scopes=sc)
     return {"status": "programado" if send_at else "enviado", "to": to, "subject": subject,
+            "mailbox": mailbox or user_email,
             "send_at": send_at or None, "attachments": [it["name"] for it in items]}
 
 
 @mcp.tool()
 def reply_email(user_email: str, message_id: str, body: str, body_type: str = "HTML",
                 reply_all: bool = False, to: str = "", cc: str = "", bcc: str = "",
-                attachments: list | None = None, send_at: str = "") -> dict:
+                attachments: list | None = None, send_at: str = "", mailbox: str = "") -> dict:
     """
     Responde a un correo existente SIN romper el hilo: la respuesta sale con el mismo
     conversationId y las cabeceras In-Reply-To/References del original, con el "RE:"
@@ -355,9 +388,13 @@ def reply_email(user_email: str, message_id: str, body: str, body_type: str = "H
     - to / cc / bcc: (opcional) destinatarios ADICIONALES separados por coma; los originales se mantienen
     - attachments: (opcional) misma forma que en send_email
     - send_at: (opcional) envío programado, hora de Madrid ISO
+    - mailbox: (opcional) buzón compartido al que apuntar (ej: pedidos@heurafoods.com).
+      Vacío = el buzón propio. Los id de correo son POR BUZÓN: si sacas el message_id de un
+      list_emails con mailbox, pásale el mismo mailbox a get_email/reply/move o dará 404.
     """
+    base, sc = _mbx(user_email, mailbox), _mbx_scopes(user_email, mailbox)
     action = "createReplyAll" if reply_all else "createReply"
-    draft = _call("POST", f"/me/messages/{message_id}/{action}", user_email)
+    draft = _call("POST", f"{base}/messages/{message_id}/{action}", user_email, scopes=sc)
     draft_id = draft.get("id")
     if not draft_id:
         raise ValueError("Graph no devolvió el borrador de respuesta")
@@ -375,15 +412,16 @@ def reply_email(user_email: str, message_id: str, body: str, body_type: str = "H
     if bcc:
         patch["bccRecipients"] = (draft.get("bccRecipients") or []) + _recipients(bcc)
     patch.update(_deferred(send_at))
-    _call("PATCH", f"/me/messages/{draft_id}", user_email, json=patch)
+    _call("PATCH", f"{base}/messages/{draft_id}", user_email, scopes=sc, json=patch)
 
     items = _collect_attachments(user_email, attachments)
-    _attach_to_message(user_email, draft_id, items)
+    _attach_to_message(user_email, draft_id, items, base, sc)
 
-    _call("POST", f"/me/messages/{draft_id}/send", user_email)
+    _call("POST", f"{base}/messages/{draft_id}/send", user_email, scopes=sc)
     final_to = patch.get("toRecipients") or draft.get("toRecipients") or []
     return {"status": "programado" if send_at else "respondido", "reply_all": reply_all,
             "subject": draft.get("subject"), "send_at": send_at or None,
+            "mailbox": mailbox or user_email,
             "to": [r.get("emailAddress", {}).get("address") for r in final_to],
             "attachments": [it["name"] for it in items],
             "conversationId": draft.get("conversationId")}
@@ -392,7 +430,7 @@ def reply_email(user_email: str, message_id: str, body: str, body_type: str = "H
 @mcp.tool()
 def forward_email(user_email: str, message_id: str, to: str, comment: str = "",
                   body_type: str = "HTML", cc: str = "", bcc: str = "",
-                  attachments: list | None = None, send_at: str = "") -> dict:
+                  attachments: list | None = None, send_at: str = "", mailbox: str = "") -> dict:
     """
     Reenvía un correo existente CONSERVANDO sus adjuntos originales y el hilo ("RV:"),
     igual que Reenviar en Outlook.
@@ -401,8 +439,12 @@ def forward_email(user_email: str, message_id: str, to: str, comment: str = "",
     - comment: texto que va encima del mensaje reenviado (opcional)
     - attachments: adjuntos ADICIONALES, misma forma que en send_email
     - send_at: (opcional) envío programado, hora de Madrid ISO
+    - mailbox: (opcional) buzón compartido al que apuntar (ej: pedidos@heurafoods.com).
+      Vacío = el buzón propio. Los id de correo son POR BUZÓN: si sacas el message_id de un
+      list_emails con mailbox, pásale el mismo mailbox a get_email/reply/move o dará 404.
     """
-    draft = _call("POST", f"/me/messages/{message_id}/createForward", user_email)
+    base, sc = _mbx(user_email, mailbox), _mbx_scopes(user_email, mailbox)
+    draft = _call("POST", f"{base}/messages/{message_id}/createForward", user_email, scopes=sc)
     draft_id = draft.get("id")
     if not draft_id:
         raise ValueError("Graph no devolvió el borrador de reenvío")
@@ -418,14 +460,15 @@ def forward_email(user_email: str, message_id: str, to: str, comment: str = "",
     if bcc:
         patch["bccRecipients"] = _recipients(bcc)
     patch.update(_deferred(send_at))
-    _call("PATCH", f"/me/messages/{draft_id}", user_email, json=patch)
+    _call("PATCH", f"{base}/messages/{draft_id}", user_email, scopes=sc, json=patch)
     items = _collect_attachments(user_email, attachments)
-    _attach_to_message(user_email, draft_id, items)
+    _attach_to_message(user_email, draft_id, items, base, sc)
     # createForward no devuelve la lista de adjuntos del borrador: se consulta aparte para informar.
-    originales = _call("GET", f"/me/messages/{draft_id}/attachments?$select=name,size", user_email).get("value", [])
-    _call("POST", f"/me/messages/{draft_id}/send", user_email)
+    originales = _call("GET", f"{base}/messages/{draft_id}/attachments?$select=name,size", user_email,
+                       scopes=sc).get("value", [])
+    _call("POST", f"{base}/messages/{draft_id}/send", user_email, scopes=sc)
     return {"status": "programado" if send_at else "reenviado", "subject": draft.get("subject"),
-            "to": to, "send_at": send_at or None,
+            "to": to, "send_at": send_at or None, "mailbox": mailbox or user_email,
             "original_attachments": [a.get("name") for a in originales if a.get("name") not in {it["name"] for it in items}],
             "attachments": [it["name"] for it in items]}
 
@@ -433,7 +476,7 @@ def forward_email(user_email: str, message_id: str, to: str, comment: str = "",
 @mcp.tool()
 def create_draft_email(user_email: str, to: str, subject: str, body: str,
                        body_type: str = "HTML", cc: str = "", bcc: str = "",
-                       attachments: list | None = None, send_at: str = "") -> dict:
+                       attachments: list | None = None, send_at: str = "", mailbox: str = "") -> dict:
     """
     Crea un borrador de email en la bandeja del usuario (no lo envía), para que lo revise
     en Outlook antes de que salga.
@@ -444,31 +487,38 @@ def create_draft_email(user_email: str, to: str, subject: str, body: str,
     - send_at: (opcional) hora de Madrid ISO; al enviarlo (desde Outlook o con send_draft_email)
       Exchange lo retendrá hasta esa hora.
     Devuelve el id del borrador para poder enviarlo con send_draft_email.
+    - mailbox: (opcional) buzón compartido al que apuntar (ej: pedidos@heurafoods.com).
+      Vacío = el buzón propio. Los id de correo son POR BUZÓN: si sacas el message_id de un
+      list_emails con mailbox, pásale el mismo mailbox a get_email/reply/move o dará 404.
     """
+    base, sc = _mbx(user_email, mailbox), _mbx_scopes(user_email, mailbox)
     msg = _message(to, subject, body, body_type, cc, bcc)
     msg.update(_deferred(send_at))
-    result = _call("POST", "/me/messages", user_email, json=msg)
+    result = _call("POST", f"{base}/messages", user_email, scopes=sc, json=msg)
     items = _collect_attachments(user_email, attachments)
     if items:
         if not result.get("id"):
             raise ValueError("Graph creo el borrador pero no devolvio su id; no se pudieron adjuntar los ficheros")
-        _attach_to_message(user_email, result["id"], items)
+        _attach_to_message(user_email, result["id"], items, base, sc)
     return {"status": "borrador_creado", "id": result.get("id"), "to": to, "subject": subject,
+            "mailbox": mailbox or user_email,
             "send_at": send_at or None, "attachments": [it["name"] for it in items],
             "webLink": result.get("webLink")}
 
 
 @mcp.tool()
-def send_draft_email(user_email: str, draft_id: str) -> dict:
+def send_draft_email(user_email: str, draft_id: str, mailbox: str = "") -> dict:
     """
     Envía un borrador previamente creado con create_draft_email.
     - draft_id: el id devuelto por create_draft_email
+    - mailbox: (opcional) el mismo buzón con el que se creó el borrador
     """
-    token   = _get_token(user_email)
+    base = _mbx(user_email, mailbox)
+    token   = _get_token(user_email, _mbx_scopes(user_email, mailbox))
     headers = {"Authorization": f"Bearer {token}"}
-    r = requests.post(f"{GRAPH}/me/messages/{draft_id}/send", headers=headers)
+    r = requests.post(f"{GRAPH}{base}/messages/{draft_id}/send", headers=headers)
     r.raise_for_status()
-    return {"status": "enviado", "draft_id": draft_id}
+    return {"status": "enviado", "draft_id": draft_id, "mailbox": mailbox or user_email}
 
 
 _WELL_KNOWN_FOLDERS = {"inbox", "archive", "deleteditems", "sentitems", "drafts", "junkemail",
@@ -479,7 +529,7 @@ _FOLDER_ALIASES = {"bandeja de entrada": "inbox", "entrada": "inbox", "archivo":
                    "correo no deseado": "junkemail", "spam": "junkemail"}
 
 
-def _folder_id(user_email: str, folder: str) -> str:
+def _folder_id(user_email: str, folder: str, base: str = "/me", scopes: list | None = None) -> str:
     """Nombre conocido, alias en castellano, nombre visible (dos niveles) o id -> id de carpeta."""
     f = (folder or "inbox").strip()
     low = f.lower()
@@ -489,13 +539,14 @@ def _folder_id(user_email: str, folder: str) -> str:
         return _FOLDER_ALIASES[low]
     if len(f) > 60 and " " not in f:
         return f
-    top = _call("GET", "/me/mailFolders?$top=200&$select=id,displayName", user_email).get("value", [])
+    top = _call("GET", f"{base}/mailFolders?$top=200&$select=id,displayName", user_email,
+                scopes=scopes).get("value", [])
     for x in top:
         if str(x.get("displayName", "")).lower() == low:
             return x["id"]
     for x in top:
-        for c in _call("GET", f"/me/mailFolders/{x['id']}/childFolders?$top=200&$select=id,displayName",
-                       user_email).get("value", []):
+        for c in _call("GET", f"{base}/mailFolders/{x['id']}/childFolders?$top=200&$select=id,displayName",
+                       user_email, scopes=scopes).get("value", []):
             if str(c.get("displayName", "")).lower() == low:
                 return c["id"]
     raise ValueError(f"No encuentro la carpeta '{folder}'. Carpetas: "
@@ -522,16 +573,19 @@ def _slim_message(m: dict) -> dict:
 
 
 @mcp.tool()
-def list_folders(user_email: str) -> list:
-    """Lista las carpetas de correo (dos niveles) con id, nombre y contadores."""
+def list_folders(user_email: str, mailbox: str = "") -> list:
+    """Lista las carpetas de correo (dos niveles) con id, nombre y contadores.
+    - mailbox: (opcional) buzón compartido; vacío = el propio.
+    """
+    base, sc = _mbx(user_email, mailbox), _mbx_scopes(user_email, mailbox)
     out = []
-    for x in _call("GET", "/me/mailFolders?$top=200&$select=id,displayName,unreadItemCount,totalItemCount,childFolderCount",
-                   user_email).get("value", []):
+    for x in _call("GET", f"{base}/mailFolders?$top=200&$select=id,displayName,unreadItemCount,totalItemCount,childFolderCount",
+                   user_email, scopes=sc).get("value", []):
         out.append({"id": x["id"], "name": x.get("displayName"), "unread": x.get("unreadItemCount"),
                     "total": x.get("totalItemCount")})
         if x.get("childFolderCount"):
-            for c in _call("GET", f"/me/mailFolders/{x['id']}/childFolders?$top=200&$select=id,displayName,unreadItemCount,totalItemCount",
-                           user_email).get("value", []):
+            for c in _call("GET", f"{base}/mailFolders/{x['id']}/childFolders?$top=200&$select=id,displayName,unreadItemCount,totalItemCount",
+                           user_email, scopes=sc).get("value", []):
                 out.append({"id": c["id"], "name": f"{x.get('displayName')}/{c.get('displayName')}",
                             "unread": c.get("unreadItemCount"), "total": c.get("totalItemCount")})
     return out
@@ -541,7 +595,7 @@ def list_folders(user_email: str) -> list:
 def list_emails(user_email: str, top: int = 10, folder: str = "inbox",
                 only_with_attachments: bool = False, search: str = "",
                 from_address: str = "", since: str = "", until: str = "",
-                unread_only: bool = False) -> list:
+                unread_only: bool = False, mailbox: str = "") -> list:
     """
     Lista o busca correos en cualquier carpeta. Devuelve id, subject, from, to, fecha,
     hasAttachments, isRead, bodyPreview, conversationId y webLink.
@@ -553,14 +607,18 @@ def list_emails(user_email: str, top: int = 10, folder: str = "inbox",
     - only_with_attachments / unread_only: filtros booleanos
     - search: texto libre (asunto/cuerpo/remitente, sintaxis KQL de Outlook). Con search, los
       demás filtros se aplican después sobre los resultados.
+    - mailbox: (opcional) buzón compartido al que apuntar (ej: pedidos@heurafoods.com).
+      Vacío = el buzón propio. Los id de correo son POR BUZÓN: si sacas el message_id de un
+      list_emails con mailbox, pásale el mismo mailbox a get_email/reply/move o dará 404.
     """
-    fid = _folder_id(user_email, folder)
+    mb, sc = _mbx(user_email, mailbox), _mbx_scopes(user_email, mailbox)
+    fid = _folder_id(user_email, folder, mb, sc)
     select = "id,subject,from,toRecipients,receivedDateTime,hasAttachments,isRead,bodyPreview,conversationId,webLink"
-    base = f"/me/mailFolders/{fid}/messages?$select={select}"
+    base = f"{mb}/mailFolders/{fid}/messages?$select={select}"
     if search:
         # $search no admite $orderby ni $filter en Graph: se filtra despues en memoria
         endpoint = base + f'&$top={min(max(top * 4, top), 250)}&$search="{search}"'
-        msgs = _call("GET", endpoint, user_email).get("value", [])
+        msgs = _call("GET", endpoint, user_email, scopes=sc).get("value", [])
         lo = _day_bounds(since, False) if since else None
         hi = _day_bounds(until, True) if until else None
         out = []
@@ -593,20 +651,25 @@ def list_emails(user_email: str, top: int = 10, folder: str = "inbox",
     if unread_only:
         filters.append("isRead eq false")
     endpoint = base + f"&$top={top}&$filter={' and '.join(filters)}&$orderby=receivedDateTime desc"
-    return [_slim_message(m) for m in _call("GET", endpoint, user_email).get("value", [])]
+    return [_slim_message(m) for m in _call("GET", endpoint, user_email, scopes=sc).get("value", [])]
 
 
 @mcp.tool()
-def get_email(user_email: str, message_id: str, as_text: bool = True, max_chars: int = 20000) -> dict:
+def get_email(user_email: str, message_id: str, as_text: bool = True, max_chars: int = 20000,
+              mailbox: str = "") -> dict:
     """
     Devuelve un correo completo: cabeceras y cuerpo (texto plano por defecto, HTML si as_text=False).
     Úsalo para leer un correo entero antes de responderlo; list_emails solo trae un extracto.
+    - mailbox: (opcional) buzón compartido al que apuntar (ej: pedidos@heurafoods.com).
+      Vacío = el buzón propio. Los id de correo son POR BUZÓN: si sacas el message_id de un
+      list_emails con mailbox, pásale el mismo mailbox a get_email/reply/move o dará 404.
     """
+    base, sc = _mbx(user_email, mailbox), _mbx_scopes(user_email, mailbox)
     prefer = {"Prefer": 'outlook.body-content-type="text"'} if as_text else None
-    m = _call("GET", f"/me/messages/{message_id}?$select=id,subject,from,toRecipients,ccRecipients,"
+    m = _call("GET", f"{base}/messages/{message_id}?$select=id,subject,from,toRecipients,ccRecipients,"
                      "receivedDateTime,sentDateTime,body,hasAttachments,isRead,conversationId,webLink,"
                      "importance,categories,flag,bccRecipients",
-              user_email, extra_headers=prefer)
+              user_email, scopes=sc, extra_headers=prefer)
     out = _slim_message(m)
     out.update({
         "cc": [(r.get("emailAddress") or {}).get("address") for r in (m.get("ccRecipients") or [])],
@@ -620,19 +683,26 @@ def get_email(user_email: str, message_id: str, as_text: bool = True, max_chars:
 
 
 @mcp.tool()
-def move_email(user_email: str, message_id: str, folder: str) -> dict:
+def move_email(user_email: str, message_id: str, folder: str, mailbox: str = "") -> dict:
     """
     Mueve un correo a otra carpeta. folder admite 'archive' (archivar), 'deleteditems',
     'inbox', 'junkemail', un nombre de carpeta tal como se ve en Outlook o un id.
+    - mailbox: (opcional) buzón compartido al que apuntar (ej: pedidos@heurafoods.com).
+      Vacío = el buzón propio. Los id de correo son POR BUZÓN: si sacas el message_id de un
+      list_emails con mailbox, pásale el mismo mailbox a get_email/reply/move o dará 404.
     """
-    dest = _folder_id(user_email, folder)
-    r = _call("POST", f"/me/messages/{message_id}/move", user_email, json={"destinationId": dest})
-    return {"status": "movido", "folder": folder, "new_id": r.get("id"), "subject": r.get("subject")}
+    base, sc = _mbx(user_email, mailbox), _mbx_scopes(user_email, mailbox)
+    dest = _folder_id(user_email, folder, base, sc)
+    r = _call("POST", f"{base}/messages/{message_id}/move", user_email, scopes=sc,
+              json={"destinationId": dest})
+    return {"status": "movido", "folder": folder, "new_id": r.get("id"), "subject": r.get("subject"),
+            "mailbox": mailbox or user_email}
 
 
 @mcp.tool()
 def mark_email(user_email: str, message_id: str, is_read: bool | None = None,
-               categories: list | None = None, flag: str = "", importance: str = "") -> dict:
+               categories: list | None = None, flag: str = "", importance: str = "",
+               mailbox: str = "") -> dict:
     """
     Marca un correo: leído/no leído, categorías, seguimiento e importancia. Solo cambia lo que se pasa.
     - is_read: true/false
@@ -657,29 +727,37 @@ def mark_email(user_email: str, message_id: str, is_read: bool | None = None,
         patch["importance"] = importance
     if not patch:
         raise ValueError("No se ha indicado nada que cambiar")
-    r = _call("PATCH", f"/me/messages/{message_id}", user_email, json=patch)
+    r = _call("PATCH", f"{_mbx(user_email, mailbox)}/messages/{message_id}", user_email,
+              scopes=_mbx_scopes(user_email, mailbox), json=patch)
     return {"status": "actualizado", "id": r.get("id"), "isRead": r.get("isRead"),
             "categories": r.get("categories"), "flag": (r.get("flag") or {}).get("flagStatus"),
             "importance": r.get("importance")}
 
 
 @mcp.tool()
-def list_categories(user_email: str) -> list:
-    """Categorías de Outlook definidas por el usuario (nombre y color), para usarlas en mark_email."""
-    r = _call("GET", "/me/outlook/masterCategories", user_email, scopes=MAILBOX_SCOPES)
+def list_categories(user_email: str, mailbox: str = "") -> list:
+    """Categorías de Outlook definidas por el usuario (nombre y color), para usarlas en mark_email.
+    - mailbox: (opcional) buzón compartido. Aviso: MailboxSettings no tiene variante .Shared,
+      así que sobre un buzón ajeno Graph puede responder 403 aunque el correo sí se lea.
+    """
+    r = _call("GET", f"{_mbx(user_email, mailbox)}/outlook/masterCategories", user_email,
+              scopes=_mbx_scopes(user_email, mailbox, MAILBOX_SCOPES))
     return [{"name": c.get("displayName"), "color": c.get("color")} for c in r.get("value", [])]
 
 
 @mcp.tool()
-def list_attachments(user_email: str, message_id: str) -> list:
+def list_attachments(user_email: str, message_id: str, mailbox: str = "") -> list:
     """
     Lista los adjuntos de un correo (sin descargar su contenido).
     - message_id: id del correo (obtenido con list_emails)
+    - mailbox: (opcional) buzón compartido al que apuntar (ej: pedidos@heurafoods.com).
+      Vacío = el buzón propio. Los id de correo son POR BUZÓN: si sacas el message_id de un
+      list_emails con mailbox, pásale el mismo mailbox a get_email/reply/move o dará 404.
     Devuelve id, name, contentType, size (bytes), isInline por cada adjunto.
     """
-    endpoint = (f"/me/messages/{message_id}/attachments"
+    endpoint = (f"{_mbx(user_email, mailbox)}/messages/{message_id}/attachments"
                 "?$select=id,name,contentType,size,isInline")
-    result = _call("GET", endpoint, user_email)
+    result = _call("GET", endpoint, user_email, scopes=_mbx_scopes(user_email, mailbox))
     return [
         {
             "id": a.get("id"),
@@ -695,7 +773,7 @@ def list_attachments(user_email: str, message_id: str) -> list:
 
 @mcp.tool()
 def get_attachment(user_email: str, message_id: str, attachment_id: str,
-                   max_mb: float = 10.0) -> dict:
+                   max_mb: float = 10.0, mailbox: str = "") -> dict:
     """
     Descarga un adjunto de tipo fichero y devuelve su contenido en base64.
     Claude debe decodificar 'content_base64' y guardarlo en disco para trabajarlo.
@@ -703,7 +781,8 @@ def get_attachment(user_email: str, message_id: str, attachment_id: str,
     - attachment_id: id del adjunto (list_attachments)
     - max_mb: límite de tamaño; por encima devuelve error (usa OneDrive para ficheros grandes)
     """
-    att = _call("GET", f"/me/messages/{message_id}/attachments/{attachment_id}", user_email)
+    att = _call("GET", f"{_mbx(user_email, mailbox)}/messages/{message_id}/attachments/{attachment_id}",
+                user_email, scopes=_mbx_scopes(user_email, mailbox))
     odata = att.get("@odata.type", "")
     if "fileAttachment" not in odata:
         return {"error": f"Adjunto no descargable como fichero (tipo {odata}). "

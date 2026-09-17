@@ -39,6 +39,10 @@ SCOPES    = ["Mail.Send", "Mail.ReadWrite", "Calendars.ReadWrite",
 SCOPES_16 = ["Tasks.ReadWrite", "MailboxSettings.ReadWrite", "People.Read", "User.ReadBasic.All",
              "Sites.Read.All", "Place.Read.All", "Team.ReadBasic.All", "Channel.ReadBasic.All",
              "ChannelMessage.Read.All"]
+# Buzones compartidos (shared inbox): dejan PEDIR el buzon de otro, no dan acceso. Quien manda
+# sigue siendo Exchange. Van con los ampliados: si Entra aun no los ha concedido, el login cae
+# al juego basico y el buzon propio sigue funcionando igual.
+SCOPES_16 += ["Mail.ReadWrite.Shared", "Mail.Send.Shared"]
 # --rotar: invalida los tokens anteriores de la persona (por defecto conviven, para que las
 # sesiones de Claude abiertas no se queden con 401).
 ROTAR = "--rotar" in sys.argv
