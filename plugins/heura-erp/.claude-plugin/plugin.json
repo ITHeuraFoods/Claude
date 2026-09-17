@@ -1,7 +1,7 @@
 {
   "name": "heura-erp",
-  "version": "1.5.1",
-  "description": "Consultas en lenguaje natural a los ERP de Heura (SAP S/4HANA y Odoo), acciones en Microsoft 365 (email con adjuntos y respuestas en hilo, calendario, Teams, OneDrive) y lectura de tareas de Microsoft To Do, context inyectado para SAP S/4HANA, y generación de dashboards. Incluye las normas de negocio internas de Heura.",
+  "version": "1.6.0",
+  "description": "Consultas en lenguaje natural a los ERP de Heura (SAP S/4HANA y Odoo), acciones en Microsoft 365 (correo completo con adjuntos, hilos, carpetas y envío programado; calendario con recurrencia, Teams, salas y disponibilidad; chats y canales de Teams; OneDrive y SharePoint; personas; fuera de oficina) y tareas de Microsoft To Do, context inyectado para SAP S/4HANA, y generación de dashboards. Incluye las normas de negocio internas de Heura.",
   "author": {
     "name": "Heura Foods IT",
     "email": "it@heurafoods.com"

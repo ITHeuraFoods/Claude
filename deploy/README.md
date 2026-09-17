@@ -48,6 +48,27 @@ desactivar localmente.
 - **macOS (Jamf / MDM):** desplegar a `/Library/Application Support/ClaudeCode/`.
 - **Linux (Ansible / script):** copiar a `/etc/claude-code/`.
 
+## Permisos de Entra para la 1.6.0 (IT, una vez)
+
+Las funciones nuevas del MCP de Graph piden permisos **delegados** adicionales en el registro de
+aplicación `1f5ff61e-43dc-48fe-af84-d9c3f558dbcc` (Entra → App registrations → API permissions →
+Microsoft Graph → Delegated). Hay que añadirlos y pulsar **Grant admin consent**:
+
+| Permiso | Para qué |
+|---|---|
+| `Tasks.ReadWrite` | crear, completar y borrar tareas de To Do |
+| `MailboxSettings.ReadWrite` | fuera de oficina y lista de categorías |
+| `People.Read`, `User.ReadBasic.All` | buscar personas por nombre (`find_person`, `to` en Teams) |
+| `Sites.Read.All` | buscar sitios de SharePoint y acceder a sus bibliotecas por URL |
+| `Place.Read.All` | listar salas de reuniones |
+| `Team.ReadBasic.All`, `Channel.ReadBasic.All` | listar equipos y canales |
+| `ChannelMessage.Read.All` | leer mensajes de canal (solo admin consent) |
+
+El script de login los pide junto a los básicos; si aún no están concedidos, repite el login solo
+con los básicos y avisa, así nadie se queda sin correo ni calendario. Cuando estén concedidos, cada
+persona relanza «Conectar M365 con Claude» **una vez**; desde la 1.6.0 eso ya no invalida el token
+anterior, así que no hace falta reiniciar Claude.
+
 ## Diagnóstico de toda la flota (Intune Platform script)
 
 Sin licencia de Remediations, un platform script solo devuelve a Intune éxito o fallo por equipo.

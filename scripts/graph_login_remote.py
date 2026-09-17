@@ -33,6 +33,15 @@ AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
 SCOPES    = ["Mail.Send", "Mail.ReadWrite", "Calendars.ReadWrite",
              "Files.ReadWrite.All", "Chat.ReadWrite", "ChannelMessage.Send",
              "Tasks.Read"]
+# Permisos de la 1.6.0 (escribir en To Do, fuera de oficina, buscar personas, SharePoint,
+# salas, equipos y canales). Se piden junto a los basicos; si Entra los rechaza porque IT
+# aun no los ha concedido, se repite el login solo con los basicos y se avisa.
+SCOPES_16 = ["Tasks.ReadWrite", "MailboxSettings.ReadWrite", "People.Read", "User.ReadBasic.All",
+             "Sites.Read.All", "Place.Read.All", "Team.ReadBasic.All", "Channel.ReadBasic.All",
+             "ChannelMessage.Read.All"]
+# --rotar: invalida los tokens anteriores de la persona (por defecto conviven, para que las
+# sesiones de Claude abiertas no se queden con 401).
+ROTAR = "--rotar" in sys.argv
 
 # Hub MCP en Hetzner, alcanzable por la LAN de Heura o por la SSL-VPN.
 # Cuando exista el registro DNS, cambiar solo estas constantes.
@@ -163,7 +172,15 @@ def main():
     print("Abriendo el navegador para el login de Microsoft...")
     cache = msal.SerializableTokenCache()
     app = msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY, token_cache=cache)
-    resultado = app.acquire_token_interactive(scopes=SCOPES)
+    resultado = app.acquire_token_interactive(scopes=SCOPES + SCOPES_16)
+    sin_permisos_nuevos = False
+    if "error" in resultado:
+        # Lo habitual si IT aun no ha concedido los permisos nuevos: repetir solo con los basicos.
+        print("  Los permisos ampliados no estan disponibles todavia; repito el login con los basicos.")
+        sin_permisos_nuevos = True
+        cache = msal.SerializableTokenCache()
+        app = msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY, token_cache=cache)
+        resultado = app.acquire_token_interactive(scopes=SCOPES)
 
     if "error" in resultado:
         salir("Error de autenticacion: "
@@ -178,7 +195,7 @@ def main():
     try:
         r = requests.post(
             f"{REGISTER_URL}/register",
-            json={"user_email": quien, "token_cache": cache.serialize()},
+            json={"user_email": quien, "token_cache": cache.serialize(), "rotate": ROTAR},
             headers={"X-Heura-Secret": SECRET},
             timeout=20,
         )
@@ -213,7 +230,15 @@ def main():
         total += creadas
 
     print(f"\nListo. {total} entradas escritas.")
-    print("REINICIA Claude para que recoja los cambios.")
+    if creadas:
+        print("Es tu primer login en este equipo: REINICIA Claude para que aparezcan los MCP.")
+    else:
+        print("No hace falta reiniciar Claude: el token anterior sigue valiendo"
+              + (" (lo has rotado: las sesiones abiertas con el viejo daran 401)." if ROTAR else "."))
+    if sin_permisos_nuevos:
+        print("AVISO: las funciones nuevas (fuera de oficina, buscar personas, SharePoint, salas, "
+              "leer canales, escribir en To Do) no funcionaran hasta que IT conceda los permisos "
+              "en Entra y vuelvas a lanzar este acceso directo.")
 
 
 if __name__ == "__main__":
