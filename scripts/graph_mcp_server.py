@@ -603,11 +603,12 @@ def get_email(user_email: str, message_id: str, as_text: bool = True, max_chars:
     prefer = {"Prefer": 'outlook.body-content-type="text"'} if as_text else None
     m = _call("GET", f"/me/messages/{message_id}?$select=id,subject,from,toRecipients,ccRecipients,"
                      "receivedDateTime,sentDateTime,body,hasAttachments,isRead,conversationId,webLink,"
-                     "importance,categories,flag",
+                     "importance,categories,flag,bccRecipients",
               user_email, extra_headers=prefer)
     out = _slim_message(m)
     out.update({
         "cc": [(r.get("emailAddress") or {}).get("address") for r in (m.get("ccRecipients") or [])],
+        "bcc": [(r.get("emailAddress") or {}).get("address") for r in (m.get("bccRecipients") or [])],
         "importance": m.get("importance"), "categories": m.get("categories"),
         "flag": (m.get("flag") or {}).get("flagStatus"),
         "body": ((m.get("body") or {}).get("content") or "")[:max_chars],
