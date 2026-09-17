@@ -10,7 +10,7 @@ desactivar localmente.
 | Fichero | Propósito |
 |---------|-----------|
 | `managed-settings.json` | Instala el marketplace y activa el plugin `heura-erp` |
-| `intune-deploy-system.ps1` | Script SYSTEM: `managed-settings.json`, `C:\heura-mcp\graph_login_remote.py` y fuentes |
+| `intune-deploy-system.ps1` | Script SYSTEM: `managed-settings.json`, `C:\heura-mcp\graph_login_remote.py`, **Python 3.12 con msal y requests** (machine-wide) y fuentes |
 | `intune-deploy-user.ps1` | Script de usuario: acceso directo de login, dependencias de Python, refresco del marketplace y alta de MCP nuevos |
 | `intune-wrapper-user.ps1` | Envoltorio local del anterior. **Gitignored: lleva el secreto de registro** |
 | `diagnostico-mcp.ps1` | Diagnóstico de «no me aparecen los MCP». Solo lee, no cambia nada |

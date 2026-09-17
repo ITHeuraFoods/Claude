@@ -1,5 +1,11 @@
 # Ejecutar en Intune con "Run as logged on user = No" (SYSTEM)
-# Instala managed-settings.json, el script de login M365 y las fuentes corporativas.
+# Instala managed-settings.json, el script de login M365, Python 3.12 con msal y requests,
+# y las fuentes corporativas.
+#
+# Python lo instalaba el script de junio (intune_deploy_heura_m365.ps1), ya retirado: los
+# equipos enrolados o reinstalados despues se quedaban sin el y el acceso directo de login
+# no arrancaba (2026-09-17). Ahora va aqui, en contexto SYSTEM, y el script de usuario solo
+# tiene que comprobar que msal y requests estan.
 #
 # Ruta correcta en Windows para que Claude Code lea la config gestionada (v2.1.75+):
 # C:\Program Files\ClaudeCode\ — la ruta legacy C:\ProgramData\ClaudeCode\ ya no se soporta.
@@ -38,6 +44,85 @@ function Get-RemoteFile($url, $outFile) {
     Write-Output "OK: $outFile"
 }
 
+# ── Python 3.12 machine-wide + msal/requests ─────────────────────────────────
+# Corre como SYSTEM: NUNCA el comando "python" a pelo, porque el alias de la Microsoft Store
+# lo secuestra y ese stub no existe en contexto SYSTEM. Siempre la ruta real del .exe.
+$PY_DIR = "C:\Program Files\Python312"
+$PY_URL = "https://www.python.org/ftp/python/3.12.4/python-3.12.4-amd64.exe"
+
+function Test-PythonWorks($exe) {
+    if (-not $exe -or -not (Test-Path $exe)) { return $false }
+    if ($exe -like "*\WindowsApps\*") { return $false }          # stub de la Store
+    if (-not (Test-Path (Join-Path (Split-Path $exe) "Lib\os.py"))) { return $false }  # instalacion rota
+    & $exe -c "print('ok')" 2>&1 | Out-Null
+    return ($LASTEXITCODE -eq 0)
+}
+
+function Find-Python {
+    foreach ($c in @("$PY_DIR\python.exe") + (Get-ChildItem "C:\Program Files\Python3*\python.exe", "C:\Python3*\python.exe" -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | ForEach-Object FullName)) {
+        if (Test-PythonWorks $c) { return $c }
+    }
+    return $null
+}
+
+function Remove-BrokenPython {
+    # Desinstala Python/py-launcher previos: causa del 0x80070643 (1603) al reinstalar.
+    $keys = @("HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
+              "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*")
+    Get-ItemProperty $keys -ErrorAction SilentlyContinue |
+        Where-Object { $_.DisplayName -match "Python (3\.|Launcher)" -and $_.UninstallString } |
+        ForEach-Object {
+            try {
+                if ($_.UninstallString -match "msiexec") {
+                    $code = ($_.UninstallString -replace '.*({[0-9A-Fa-f\-]+}).*', '$1')
+                    Start-Process msiexec.exe -ArgumentList "/x $code /quiet /norestart" -Wait -ErrorAction SilentlyContinue
+                } else {
+                    Start-Process $_.UninstallString -ArgumentList "/quiet /uninstall" -Wait -ErrorAction SilentlyContinue
+                }
+            } catch {}
+        }
+    Get-ChildItem "C:\Program Files\Python3*", "C:\Python3*" -ErrorAction SilentlyContinue |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+function Install-Python {
+    $inst = "$env:TEMP\python312_setup.exe"
+    Invoke-WebRequest $PY_URL -OutFile $inst -UseBasicParsing
+    # Include_launcher=0: el py launcher huerfano es lo que provocaba el 0x80070643.
+    $args = "/quiet InstallAllUsers=1 PrependPath=1 Include_launcher=0 Include_test=0 AssociateFiles=0 TargetDir=`"$PY_DIR`""
+    $p = Start-Process -FilePath $inst -ArgumentList $args -Wait -PassThru
+    Remove-Item $inst -Force -ErrorAction SilentlyContinue
+    return $p.ExitCode
+}
+
+function Ensure-Python {
+    # Devuelve $true si al terminar hay Python operativo con msal y requests.
+    $exe = Find-Python
+    if (-not $exe) {
+        Write-Output "Python no encontrado: instalando 3.12 para todos los usuarios..."
+        $code = Install-Python
+        if ($code -ne 0) {
+            Write-Output "El instalador devolvio $code; limpio restos y reintento."
+            Remove-BrokenPython
+            $code = Install-Python
+        }
+        if ($code -ne 0) { Write-Output "ERROR: el instalador de Python fallo dos veces (codigo $code)."; return $false }
+        $exe = Find-Python
+        if (-not $exe) { Write-Output "ERROR: Python no aparece tras la instalacion."; return $false }
+    }
+    Write-Output "Python: $exe"
+    # Dependencias machine-wide (site-packages del sistema): visibles para todos los usuarios.
+    & $exe -c "import msal, requests" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Output "Instalando msal y requests..."
+        & $exe -m pip install --quiet --disable-pip-version-check --upgrade msal requests 2>&1 | Out-Null
+        & $exe -c "import msal, requests" 2>$null
+        if ($LASTEXITCODE -ne 0) { Write-Output "ERROR: no se pudieron instalar msal y requests."; return $false }
+    }
+    Write-Output "msal y requests: OK"
+    return $true
+}
+
 try {
     New-Item -ItemType Directory -Force $dest | Out-Null
 
@@ -52,6 +137,11 @@ try {
     New-Item -ItemType Directory -Force "C:\heura-mcp" | Out-Null
     Get-RemoteFile "$base/scripts/graph_login_remote.py" "C:\heura-mcp\graph_login_remote.py"
 
+    # Python + msal: si falla, se sigue con el resto y se devuelve exit 1 al final para que
+    # Intune lo reintente y el equipo salga como Failed.
+    $pythonOk = $false
+    try { $pythonOk = Ensure-Python } catch { Write-Output "ERROR instalando Python: $_" }
+
     # Fuentes: si fallan no deben bloquear el despliegue del plugin/MCP.
     try {
         $fontScript = "$dest\install-fonts.ps1"
@@ -62,6 +152,11 @@ try {
         Write-Warning "Fuentes no instaladas (no bloqueante): $_"
     }
 
+    if (-not $pythonOk) {
+        Write-Output "Despliegue SYSTEM completado SIN Python operativo: el login M365 no funcionara en este equipo."
+        Stop-Transcript
+        exit 1
+    }
     Write-Output "Despliegue SYSTEM completado."
     Stop-Transcript
     exit 0
