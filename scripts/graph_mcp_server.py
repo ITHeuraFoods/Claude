@@ -421,10 +421,12 @@ def forward_email(user_email: str, message_id: str, to: str, comment: str = "",
     _call("PATCH", f"/me/messages/{draft_id}", user_email, json=patch)
     items = _collect_attachments(user_email, attachments)
     _attach_to_message(user_email, draft_id, items)
+    # createForward no devuelve la lista de adjuntos del borrador: se consulta aparte para informar.
+    originales = _call("GET", f"/me/messages/{draft_id}/attachments?$select=name,size", user_email).get("value", [])
     _call("POST", f"/me/messages/{draft_id}/send", user_email)
     return {"status": "programado" if send_at else "reenviado", "subject": draft.get("subject"),
             "to": to, "send_at": send_at or None,
-            "original_attachments": [a.get("name") for a in (draft.get("attachments") or [])],
+            "original_attachments": [a.get("name") for a in originales if a.get("name") not in {it["name"] for it in items}],
             "attachments": [it["name"] for it in items]}
 
 
