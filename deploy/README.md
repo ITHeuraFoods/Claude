@@ -85,8 +85,13 @@ Comprobar en este orden:
    module named 'encodings'`, que no tiene nada que ver con las dependencias. Se arregla con
    Aplicaciones → Python 3.12 → Modificar → Repair.
 8. En Claude Code: `/plugin` para ver si `heura-erp@heura` está instalado.
+9. La versión instalada es la del marketplace: `version` de `heura-erp@heura` en
+   `~/.claude/plugins/installed_plugins.json` frente a `plugins/heura-erp/.claude-plugin/plugin.json`
+   del clon. Claude Code carga el plugin desde `~/.claude/plugins/cache/heura/heura-erp/<versión>/`,
+   no desde el clon: refrescar el clon (lo que hace el script de usuario) no sirve de nada si la
+   versión no ha subido. Arreglo: `/plugin update heura-erp@heura` y cerrar/abrir Claude.
 
-**Atajo: `deploy/diagnostico-mcp.ps1` comprueba los ocho puntos de golpe** y dice qué hacer,
+**Atajo: `deploy/diagnostico-mcp.ps1` comprueba los nueve puntos de golpe** y dice qué hacer,
 en orden. Solo lee:
 
 ```powershell

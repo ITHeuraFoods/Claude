@@ -129,10 +129,14 @@ try {
     # normal, lo forzamos aqui.
     #
     # fetch + reset --hard, NO pull: el clon acumula modificaciones locales
-    # (entre otras, el token que el script de login escribe en el .mcp.json del
-    # plugin) y un pull se quedaria bloqueado por el conflicto. Descartarlas es
-    # seguro: la configuracion que Claude Code lee de verdad es ~/.claude.json,
+    # (hasta la 1.4.0, el token que el script de login escribia en el .mcp.json
+    # del plugin) y un pull se quedaria bloqueado por el conflicto. Descartarlas
+    # es seguro: la configuracion que Claude Code lee de verdad es ~/.claude.json,
     # y el login la reescribe.
+    #
+    # OJO: esto refresca el CLON, no lo que Claude carga. Claude usa la cache
+    # ~/.claude/plugins/cache/heura/heura-erp/<version>/ y solo la renueva si
+    # plugin.json sube de version. Todo cambio en el plugin exige subir version.
     $mk = "$env:USERPROFILE\.claude\plugins\marketplaces\heura"
     $git = (Get-Command git -ErrorAction SilentlyContinue).Source
     if (-not $git) {

@@ -53,6 +53,35 @@ if (Test-Path $mk) {
         Reporta $wr "la skill sap-heura es la version vieja (ejecuta scripts en local)"
         $problemas += "Refrescar el marketplace: volver a lanzar el script de usuario de Intune"
     }
+    # Lo que Claude carga NO es el clon sino la cache por version. Si plugin.json
+    # sube de version y la cache no, el usuario sigue con skills y config viejas
+    # (paso en la 1.4.0: tres cambios de septiembre que nadie recibio).
+    $pj = "$mk\plugins\heura-erp\.claude-plugin\plugin.json"
+    $ip = "$env:USERPROFILE\.claude\plugins\installed_plugins.json"
+    if ((Test-Path $pj) -and (Test-Path $ip)) {
+        try {
+            $vMarket = (Get-Content $pj -Raw | ConvertFrom-Json).version
+            $inst = (Get-Content $ip -Raw | ConvertFrom-Json).plugins.'heura-erp@heura'
+            if ($inst) {
+                $inst = @($inst)[0]
+                if ($inst.version -eq $vMarket) {
+                    Reporta $ok "plugin heura-erp instalado en la version $($inst.version), la del marketplace"
+                } else {
+                    Reporta $wr "Claude carga la version $($inst.version) del plugin y el marketplace tiene la $vMarket (cache vieja)"
+                    $problemas += "En Claude: /plugin update heura-erp@heura y despues CERRAR Claude del todo y volver a abrirlo"
+                }
+                if ($inst.installPath -and (Test-Path "$($inst.installPath)\.mcp.json")) {
+                    Reporta $wr "la cache del plugin aun declara MCP sin token (generan 401 y ruido de 'servidor caido')"
+                    $problemas += "Actualizar el plugin a la 1.5.0 o superior, que ya no lleva .mcp.json"
+                }
+            } else {
+                Reporta $ko "heura-erp@heura NO figura como instalado en installed_plugins.json"
+                $problemas += "En Claude: /plugin install heura-erp@heura (o CERRAR y abrir Claude si la politica acaba de llegar)"
+            }
+        } catch {
+            Reporta $wr "no se pudo comparar la version instalada del plugin ($_)"
+        }
+    }
 } else {
     Reporta $ko "el marketplace heura NO esta clonado"
     $problemas += "Claude no ha arrancado desde que llego la politica: CERRAR Claude del todo y volver a abrirlo"

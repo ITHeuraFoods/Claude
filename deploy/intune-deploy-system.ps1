@@ -5,9 +5,10 @@
 # C:\Program Files\ClaudeCode\ — la ruta legacy C:\ProgramData\ClaudeCode\ ya no se soporta.
 #
 # Ya no desplegamos managed-mcp.json: daba control EXCLUSIVO sobre MCP (ningún usuario podía
-# añadir MCP propios en ninguna máquina de la flota). sap-heura-remote y graph-heura-remote
-# ahora se distribuyen como MCP del plugin heura-erp (plugins/heura-erp/.mcp.json), que no es
-# exclusivo. Se borra el fichero si ya existe de un despliegue anterior.
+# añadir MCP propios en ninguna máquina de la flota). Se borra el fichero si ya existe de un
+# despliegue anterior. Los servidores MCP (sap, graph, odoo) los escribe el acceso directo de
+# login en el ~/.claude.json de cada persona, CON su token. El plugin no declara ninguno: una
+# entrada sin token siempre recibe 401 del hub (asi fue hasta la 1.4.0; retirado en la 1.5.0).
 #
 # Log de despliegue: C:\ProgramData\HeuraIT\claude-deploy-system.log — primer sitio donde
 # mirar si un equipo no recibe el plugin.

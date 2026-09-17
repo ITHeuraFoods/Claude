@@ -37,6 +37,12 @@ Cada llamada exige un token bearer que identifica a quien pregunta, y queda regi
 token lo emite el hub tras un login real contra Entra: es lo que hace el acceso directo
 **«Conectar M365 con Claude»** del escritorio, que solo hay que ejecutar una vez.
 
+Ese acceso directo escribe los tres servidores, **con el token**, en el `~/.claude.json` de la
+persona. El plugin **no declara servidores MCP**: una entrada sin token siempre recibe 401 del
+hub y Claude Code la muestra como «Dynamic Client Registration rejected (HTTP 401)», ruido que
+hace creer que SAP o M365 están caídos. Hasta la 1.4.0 el plugin llevaba un `.mcp.json` con
+esas entradas; se retiró en la 1.5.0.
+
 **El hub solo es alcanzable desde la red de Heura o con la SSL-VPN conectada.** Si los MCP
 no aparecen, lo primero es comprobar la VPN; después, el diagnóstico de `deploy/`.
 
@@ -83,6 +89,10 @@ o `plugins/heura-brand/skills/heura-brand-deck/SKILL.md` para normas de marca).
 
 1. Edita el `SKILL.md` correspondiente.
 2. Sube la versión en el `plugin.json` de su plugin (p. ej. `plugins/heura-brand/.claude-plugin/plugin.json`).
+   **Obligatorio para cualquier cambio dentro del plugin**, no solo para normas: Claude Code carga el
+   plugin desde su caché `~/.claude/plugins/cache/heura/<plugin>/<versión>/` y ni `autoUpdate` ni
+   `/plugin update` la refrescan si la versión no cambia. La 1.4.0 estuvo del 05-08 al 17-09 con
+   tres cambios de `.mcp.json` y de skill que nadie recibió.
 3. `git commit` + `git push`.
 
 Los usuarios reciben el cambio con `/plugin update` (o automáticamente si está desplegado
