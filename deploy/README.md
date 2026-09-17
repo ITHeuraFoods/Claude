@@ -48,6 +48,20 @@ desactivar localmente.
 - **macOS (Jamf / MDM):** desplegar a `/Library/Application Support/ClaudeCode/`.
 - **Linux (Ansible / script):** copiar a `/etc/claude-code/`.
 
+## Diagnóstico de toda la flota (Intune Remediations)
+
+`intune-detect-mcp.ps1` es la versión no interactiva de `diagnostico-mcp.ps1`: una línea por equipo
+(`EQUIPO usuario | plugin=1.5.1 mcp-con-token=3/3 hub-alcanzable=3/3 | OK` o `KO: sin-login-m365 ...`)
+y exit 1 si hay algo que arreglar. Se despliega en Intune → Devices → Scripts and remediations →
+**Remediations** → Create, solo como *Detection script*, con «Run this script using the logged-on
+credentials» = **Yes** y 64 bits = **Yes**. El informe de la remediation (columna *Pre-remediation
+detection output*, exportable a CSV) da el estado de cada equipo sin tocar ninguno.
+
+Códigos KO: `sin-managed-settings`, `policy-sin-heura-erp`, `marketplace-no-clonado`,
+`plugin-no-instalado`, `plugin-cache-vieja(instalada<marketplace)`, `claude-nunca-abierto`,
+`sin-login-m365` (no ha ejecutado el acceso directo), `faltan-mcp(...)`, `sin-acceso-directo`,
+`sin-python`, `python-roto`, `python-sin-msal`. `hub-alcanzable` es informativo: sin VPN da 0/3.
+
 ## Verificación
 
 En un equipo cualquiera, el usuario debería ver el plugin `heura-erp` instalado y activo

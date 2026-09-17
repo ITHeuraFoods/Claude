@@ -1,5 +1,9 @@
 import os
 import json
+import base64
+import binascii
+import html
+import mimetypes
 import secrets as secrets_mod
 import threading
 import requests
@@ -82,45 +86,216 @@ def _call(method: str, endpoint: str, user_email: str, scopes: list | None = Non
 
 # ── CORREO ──────────────────────────────────────────────────────────────────
 
+# Graph admite adjuntos inline (fileAttachment con contentBytes) hasta ~3 MB por
+# fichero y 4 MB por peticion, base64 incluido. Por encima hace falta una
+# uploadSession, que no implementamos: para eso esta OneDrive.
+_MAX_ATTACH_MB = 3.0
+
+
+def _recipients(csv: str) -> list:
+    return [{"emailAddress": {"address": a.strip()}} for a in (csv or "").split(",") if a.strip()]
+
+
+def _onedrive_bytes(user_email: str, path: str) -> bytes:
+    """Descarga un fichero del OneDrive del usuario por ruta ('Documentos/x.pdf')."""
+    token = _get_token(user_email)
+    p = "/" + path.strip().lstrip("/")
+    r = requests.get(f"{GRAPH}/me/drive/root:{p}:/content",
+                     headers={"Authorization": f"Bearer {token}"}, timeout=60)
+    if not r.ok:
+        raise ValueError(f"No se pudo leer '{path}' del OneDrive de {user_email}: "
+                         f"{r.status_code} {r.reason}")
+    return r.content
+
+
+def _share_bytes(user_email: str, url: str) -> tuple:
+    """
+    Descarga un fichero a partir de un enlace compartido de SharePoint u OneDrive
+    (el que da "Copiar vinculo" en la web). Graph lo resuelve por /shares/{id},
+    con id = "u!" + base64url(url). El usuario tiene que tener acceso al fichero.
+    Devuelve (nombre, bytes).
+    """
+    token = _get_token(user_email)
+    sid = "u!" + base64.urlsafe_b64encode(url.strip().encode()).decode().rstrip("=")
+    h = {"Authorization": f"Bearer {token}"}
+    meta = requests.get(f"{GRAPH}/shares/{sid}/driveItem?$select=name,size,file", headers=h, timeout=60)
+    if not meta.ok:
+        raise ValueError(f"No se pudo resolver el enlace compartido ({meta.status_code} {meta.reason}). "
+                         "Comprueba que es un enlace de SharePoint/OneDrive y que tienes acceso.")
+    item = meta.json()
+    if "file" not in item:
+        raise ValueError("El enlace apunta a una carpeta o a un sitio, no a un fichero.")
+    if item.get("size", 0) > _MAX_ATTACH_MB * 1024 * 1024:
+        raise ValueError(f"'{item.get('name')}' pesa {item.get('size', 0) / 1048576:.1f} MB; el maximo por "
+                         f"fichero es {_MAX_ATTACH_MB:g} MB. Pon el enlace en el cuerpo del correo.")
+    r = requests.get(f"{GRAPH}/shares/{sid}/driveItem/content", headers=h, timeout=60)
+    if not r.ok:
+        raise ValueError(f"No se pudo descargar '{item.get('name')}': {r.status_code} {r.reason}")
+    return item.get("name") or "adjunto", r.content
+
+
+def _attachments_payload(user_email: str, attachments: list | None) -> list:
+    """
+    Convierte la lista de adjuntos de las tools en fileAttachment de Graph.
+
+    Cada elemento es un dict con UNA de estas tres formas:
+      {"share_url": "https://heurafoods.sharepoint.com/:x:/s/.../archivo.xlsx"}   <- enlace de SharePoint/OneDrive
+      {"onedrive_path": "Documentos/Informes/informe.pdf", "name": "opcional.pdf"} <- ruta en el OneDrive propio
+      {"name": "informe.pdf", "content_base64": "<base64>", "content_type": "application/pdf"}
+
+    Los ficheros del portatil del usuario no son accesibles desde el hub: para
+    esos, o estan en SharePoint/OneDrive (lo normal en Heura) o Claude los manda
+    en base64, que solo es razonable para ficheros pequenos.
+    content_type es opcional; si falta se deduce de la extension.
+    """
+    out, total = [], 0
+    for i, a in enumerate(attachments or []):
+        if isinstance(a, str):
+            try:
+                a = json.loads(a)
+            except ValueError:
+                raise ValueError(f"Adjunto {i}: se esperaba un objeto JSON, no texto")
+        if not isinstance(a, dict):
+            raise ValueError(f"Adjunto {i}: se esperaba un objeto, no {type(a).__name__}")
+        if a.get("share_url"):
+            name, data = _share_bytes(user_email, a["share_url"])
+            name = a.get("name") or name
+            b64, size = base64.b64encode(data).decode(), len(data)
+        elif a.get("onedrive_path"):
+            data = _onedrive_bytes(user_email, a["onedrive_path"])
+            name = a.get("name") or a["onedrive_path"].rstrip("/").rsplit("/", 1)[-1]
+            b64, size = base64.b64encode(data).decode(), len(data)
+        elif a.get("content_base64"):
+            name = a.get("name")
+            if not name:
+                raise ValueError(f"Adjunto {i}: falta 'name'")
+            b64 = "".join(str(a["content_base64"]).split())
+            try:
+                size = len(base64.b64decode(b64, validate=True))
+            except (binascii.Error, ValueError):
+                raise ValueError(f"Adjunto '{name}': content_base64 no es base64 valido")
+        else:
+            raise ValueError(f"Adjunto {i}: hace falta 'share_url', 'onedrive_path' o 'content_base64'")
+        if size > _MAX_ATTACH_MB * 1024 * 1024:
+            raise ValueError(f"Adjunto '{name}' pesa {size / 1048576:.1f} MB; el maximo por fichero "
+                             f"es {_MAX_ATTACH_MB:g} MB. Subelo a OneDrive con "
+                             "upload_file_to_onedrive y pon el enlace en el cuerpo.")
+        total += size
+        item = {"@odata.type": "#microsoft.graph.fileAttachment", "name": name, "contentBytes": b64}
+        ctype = a.get("content_type") or mimetypes.guess_type(name)[0]
+        if ctype:
+            item["contentType"] = ctype
+        out.append(item)
+    if total > _MAX_ATTACH_MB * 1024 * 1024:
+        raise ValueError(f"Los adjuntos suman {total / 1048576:.1f} MB; el maximo por correo es "
+                         f"{_MAX_ATTACH_MB:g} MB. Reparte en varios correos o usa OneDrive.")
+    return out
+
+
 @mcp.tool()
 def send_email(user_email: str, to: str, subject: str, body: str,
-               body_type: str = "HTML", cc: str = "") -> dict:
+               body_type: str = "HTML", cc: str = "",
+               attachments: list | None = None) -> dict:
     """
-    Envía un email en nombre del usuario.
+    Envía un email NUEVO en nombre del usuario.
     - user_email: email M365 del remitente (ej: ana@heurafoods.com)
     - to: destinatario/s separados por coma
     - cc: (opcional) destinatarios en copia
     - body_type: 'HTML' o 'Text'
+    - attachments: (opcional) lista de adjuntos, cada uno
+        {"share_url": "https://heurafoods.sharepoint.com/..."} (enlace de SharePoint/OneDrive),
+        {"onedrive_path": "Documentos/Informes/informe.pdf"} o
+        {"name": "informe.pdf", "content_base64": "..."}.
+      Máximo 3 MB por fichero y por correo.
+    Para responder a un correo existente usa reply_email, no send_email: si no, rompes el hilo.
     """
     msg = {
         "subject": subject,
         "body": {"contentType": body_type, "content": body},
-        "toRecipients": [{"emailAddress": {"address": a.strip()}} for a in to.split(",") if a.strip()],
+        "toRecipients": _recipients(to),
     }
     if cc:
-        msg["ccRecipients"] = [{"emailAddress": {"address": a.strip()}} for a in cc.split(",") if a.strip()]
+        msg["ccRecipients"] = _recipients(cc)
+    atts = _attachments_payload(user_email, attachments)
+    if atts:
+        msg["attachments"] = atts
     _call("POST", "/me/sendMail", user_email, json={"message": msg})
-    return {"status": "enviado", "to": to, "subject": subject}
+    return {"status": "enviado", "to": to, "subject": subject,
+            "attachments": [a["name"] for a in atts]}
+
+
+@mcp.tool()
+def reply_email(user_email: str, message_id: str, body: str, body_type: str = "HTML",
+                reply_all: bool = False, to: str = "", cc: str = "",
+                attachments: list | None = None) -> dict:
+    """
+    Responde a un correo existente SIN romper el hilo: la respuesta sale con el mismo
+    conversationId y las cabeceras In-Reply-To/References del original, con el "RE:"
+    y el mensaje citado debajo, igual que desde Outlook.
+    - message_id: id del correo original (de list_emails)
+    - body: texto de la respuesta; va encima del mensaje citado
+    - body_type: 'HTML' o 'Text'
+    - reply_all: True para responder a todos los destinatarios originales
+    - to / cc: (opcional) destinatarios ADICIONALES separados por coma; los originales se mantienen
+    - attachments: (opcional) misma forma que en send_email
+    """
+    action = "createReplyAll" if reply_all else "createReply"
+    draft = _call("POST", f"/me/messages/{message_id}/{action}", user_email)
+    draft_id = draft.get("id")
+    if not draft_id:
+        raise ValueError("Graph no devolvió el borrador de respuesta")
+
+    quoted = draft.get("body") or {}
+    quoted_html = quoted.get("content", "")
+    if str(quoted.get("contentType", "html")).lower() == "text":
+        quoted_html = "<div>" + html.escape(quoted_html).replace("\n", "<br>") + "</div>"
+    if body_type.lower() == "text":
+        body_html = "<div>" + html.escape(body).replace("\n", "<br>") + "</div>"
+    else:
+        body_html = body
+
+    patch = {"body": {"contentType": "HTML", "content": body_html + quoted_html}}
+    if to:
+        patch["toRecipients"] = (draft.get("toRecipients") or []) + _recipients(to)
+    if cc:
+        patch["ccRecipients"] = (draft.get("ccRecipients") or []) + _recipients(cc)
+    _call("PATCH", f"/me/messages/{draft_id}", user_email, json=patch)
+
+    atts = _attachments_payload(user_email, attachments)
+    for att in atts:
+        _call("POST", f"/me/messages/{draft_id}/attachments", user_email, json=att)
+
+    _call("POST", f"/me/messages/{draft_id}/send", user_email)
+    final_to = patch.get("toRecipients") or draft.get("toRecipients") or []
+    return {"status": "respondido", "reply_all": reply_all, "subject": draft.get("subject"),
+            "to": [r.get("emailAddress", {}).get("address") for r in final_to],
+            "attachments": [a["name"] for a in atts],
+            "conversationId": draft.get("conversationId")}
 
 
 @mcp.tool()
 def create_draft_email(user_email: str, to: str, subject: str, body: str,
-                       body_type: str = "HTML", cc: str = "") -> dict:
+                       body_type: str = "HTML", cc: str = "",
+                       attachments: list | None = None) -> dict:
     """
     Crea un borrador de email en la bandeja del usuario (no lo envía).
     - user_email: email M365 del remitente (ej: ana@heurafoods.com)
     - to: destinatario/s separados por coma
     - cc: (opcional) destinatarios en copia
     - body_type: 'HTML' o 'Text'
+    - attachments: (opcional) misma forma que en send_email
     Devuelve el id del borrador para poder enviarlo o editarlo después.
     """
     msg = {
         "subject": subject,
         "body": {"contentType": body_type, "content": body},
-        "toRecipients": [{"emailAddress": {"address": a.strip()}} for a in to.split(",") if a.strip()],
+        "toRecipients": _recipients(to),
     }
     if cc:
-        msg["ccRecipients"] = [{"emailAddress": {"address": a.strip()}} for a in cc.split(",") if a.strip()]
+        msg["ccRecipients"] = _recipients(cc)
+    atts = _attachments_payload(user_email, attachments)
+    if atts:
+        msg["attachments"] = atts
     result = _call("POST", "/me/messages", user_email, json=msg)
     return {"status": "borrador_creado", "id": result.get("id"), "to": to, "subject": subject}
 
@@ -259,18 +434,32 @@ def create_calendar_event(user_email: str, subject: str, start: str, end: str,
 # ── ONEDRIVE / SHAREPOINT ────────────────────────────────────────────────────
 
 @mcp.tool()
-def upload_file_to_onedrive(user_email: str, filename: str, content: str,
-                             folder_path: str = "") -> dict:
+def upload_file_to_onedrive(user_email: str, filename: str, content: str = "",
+                             folder_path: str = "", content_base64: str = "") -> dict:
     """
-    Crea o sobreescribe un archivo de texto en OneDrive del usuario.
+    Crea o sobreescribe un archivo en OneDrive del usuario.
     - folder_path: ruta dentro de OneDrive, ej: 'Documentos/Informes' (vacío = raíz)
-    - content: contenido del fichero como texto plano o HTML
+    - content: contenido como texto plano o HTML (ficheros de texto)
+    - content_base64: contenido binario en base64 (PDF, Excel...). Excluyente con content.
+      Máximo 4 MB; por encima hace falta una sesión de subida, que no está implementada.
+    La ruta resultante ('Documentos/Informes/x.pdf') sirve como onedrive_path en send_email
+    y reply_email para adjuntar el fichero sin volver a mandarlo.
     """
-    token   = _get_token(user_email)
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "text/plain"}
+    token = _get_token(user_email)
+    if content_base64:
+        try:
+            data = base64.b64decode("".join(content_base64.split()), validate=True)
+        except (binascii.Error, ValueError):
+            raise ValueError("content_base64 no es base64 válido")
+        ctype = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    else:
+        data, ctype = content.encode(), "text/plain"
+    if len(data) > 4 * 1024 * 1024:
+        raise ValueError(f"El fichero pesa {len(data) / 1048576:.1f} MB; el máximo de esta tool son 4 MB.")
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": ctype}
     path    = f"/{folder_path}/{filename}".replace("//", "/")
     r       = requests.put(f"{GRAPH}/me/drive/root:{path}:/content",
-                           headers=headers, data=content.encode())
+                           headers=headers, data=data)
     r.raise_for_status()
     result = r.json()
     return {"status": "subido", "name": result.get("name"), "webUrl": result.get("webUrl")}
