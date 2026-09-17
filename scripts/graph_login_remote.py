@@ -21,11 +21,26 @@ que hacer si alguien cambia de equipo o cree que su token se ha filtrado.
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
-import msal
-import requests
+# Dependencias: si faltan, se instalan para este usuario con el MISMO interprete que
+# ejecuta el script. Cubre dos casos vistos el 2026-09-17: pip fallo en el despliegue
+# SYSTEM, o el acceso directo arranco otro Python (el de la Store) sin msal.
+try:
+    import msal
+    import requests
+except ImportError:
+    print("Faltan msal o requests en", sys.executable, "- instalando para tu usuario...")
+    r = subprocess.run([sys.executable, "-m", "pip", "install", "--user", "--quiet",
+                        "--disable-pip-version-check", "msal", "requests"])
+    if r.returncode != 0:
+        print("\nERROR: no se pudieron instalar msal y requests. Avisa a IT (it@heurafoods.com) "
+              "indicando que el equipo necesita Python 3.12 con msal.\n")
+        sys.exit(1)
+    import msal
+    import requests
 
 CLIENT_ID = "1f5ff61e-43dc-48fe-af84-d9c3f558dbcc"
 TENANT_ID = "4ff8acc2-4c1a-49ba-9344-9e47d370f6fc"

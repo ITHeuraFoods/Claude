@@ -115,9 +115,11 @@ function Ensure-Python {
     & $exe -c "import msal, requests" 2>$null
     if ($LASTEXITCODE -ne 0) {
         Write-Output "Instalando msal y requests..."
-        & $exe -m pip install --quiet --disable-pip-version-check --upgrade msal requests 2>&1 | Out-Null
+        # Salida visible en el transcript: si pip falla (proxy, PyPI, permisos) hay que verlo.
+        & $exe -m pip install --disable-pip-version-check --no-warn-script-location --upgrade msal requests 2>&1 |
+            ForEach-Object { Write-Output "  pip: $_" }
         & $exe -c "import msal, requests" 2>$null
-        if ($LASTEXITCODE -ne 0) { Write-Output "ERROR: no se pudieron instalar msal y requests."; return $false }
+        if ($LASTEXITCODE -ne 0) { Write-Output "ERROR: no se pudieron instalar msal y requests (ver lineas pip: arriba)."; return $false }
     }
     Write-Output "msal y requests: OK"
     return $true

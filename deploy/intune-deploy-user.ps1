@@ -20,10 +20,12 @@ try {
         Write-Warning "Aún no existe $loginScript (el script SYSTEM no ha corrido); el acceso directo funcionará cuando llegue."
     }
 
-    # Misma ruta absoluta de Python que usa la skill, para evitar el alias-stub de la Microsoft
-    # Store; si no existe en esta máquina, cae a "python" del PATH.
+    # El acceso directo elige el Python EN EL MOMENTO DE EJECUTARSE, no al crearse: si el
+    # script de usuario corre antes de que el SYSTEM instale Python, un acceso directo con
+    # "python" a secas acabaria en el alias de la Microsoft Store (sin msal). Se prefiere la
+    # ruta real de Program Files y solo si no existe se cae a "python" del PATH.
     $pythonAbs = "C:\Program Files\Python312\python.exe"
-    $pythonCmd = if (Test-Path $pythonAbs) { "& '$pythonAbs'" } else { "python" }
+    $pythonCmd = "`$py = if (Test-Path '$pythonAbs') { '$pythonAbs' } else { 'python' }; & `$py"
 
     # Acceso directo en el escritorio
     $desktopPath = [Environment]::GetFolderPath("Desktop")
