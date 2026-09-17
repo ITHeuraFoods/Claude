@@ -9,3 +9,4 @@ __pycache__/
 *session*.json
 .env
 deploy/intune-wrapper-user.ps1
+deploy/intune-wrapper-diag.ps1

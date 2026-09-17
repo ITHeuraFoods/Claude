@@ -48,14 +48,31 @@ desactivar localmente.
 - **macOS (Jamf / MDM):** desplegar a `/Library/Application Support/ClaudeCode/`.
 - **Linux (Ansible / script):** copiar a `/etc/claude-code/`.
 
-## Diagnóstico de toda la flota (Intune Remediations)
+## Diagnóstico de toda la flota (Intune Platform script)
 
-`intune-detect-mcp.ps1` es la versión no interactiva de `diagnostico-mcp.ps1`: una línea por equipo
-(`EQUIPO usuario | plugin=1.5.1 mcp-con-token=3/3 hub-alcanzable=3/3 | OK` o `KO: sin-login-m365 ...`)
-y exit 1 si hay algo que arreglar. Se despliega en Intune → Devices → Scripts and remediations →
-**Remediations** → Create, solo como *Detection script*, con «Run this script using the logged-on
-credentials» = **Yes** y 64 bits = **Yes**. El informe de la remediation (columna *Pre-remediation
-detection output*, exportable a CSV) da el estado de cada equipo sin tocar ninguno.
+Sin licencia de Remediations, un platform script solo devuelve a Intune éxito o fallo por equipo.
+`intune-diag-user.ps1` aprovecha las dos vías:
+
+- **Exit 1 si hay algo que arreglar** → en Intune (Devices → Scripts → el script → Device status)
+  la lista de equipos «Failed» es la lista de equipos con problemas. No cambia nada en el equipo.
+- **Envía su línea de estado al hub** (`POST http://mcp.heurafoods.com:3003/diag`, con el secreto de
+  registro) cuando lo alcanza. El hub la guarda en `/var/lib/heura-mcp/diag/equipos.tsv`; la última
+  línea de cada equipo es la que vale:
+
+  ```bash
+  ssh srv-mcp "sudo sort -t\$'\t' -k2,2 -k1,1 /var/lib/heura-mcp/diag/equipos.tsv | awk -F'\t' '{u[\$2]=\$0} END{for(k in u) print u[k]}' | sort -k4"
+  ```
+- También deja la línea en `%LOCALAPPDATA%\HeuraIT\claude-diag.log` del equipo.
+
+Formato: `EQUIPO usuario | plugin=1.5.1 mcp-con-token=3/3 hub-alcanzable=3/3 | OK` o
+`... | KO: sin-login-m365 plugin-cache-vieja(1.4.0<1.5.1)`.
+
+Despliegue: como el script de usuario, con un wrapper local que lleva el secreto (gitignored):
+`intune-wrapper-diag.ps1` → Platform scripts, «Run this script using the logged on credentials» = **Yes**,
+64 bits = **Yes**. Los platform scripts se ejecutan **una vez** por equipo (y reintentan los fallidos 3
+veces): para repetir el diagnóstico hay que volver a subir el script con algún cambio.
+
+`intune-detect-mcp.ps1` es la misma detección en formato Remediations, por si algún día hay licencia.
 
 Códigos KO: `sin-managed-settings`, `policy-sin-heura-erp`, `marketplace-no-clonado`,
 `plugin-no-instalado`, `plugin-cache-vieja(instalada<marketplace)`, `claude-nunca-abierto`,

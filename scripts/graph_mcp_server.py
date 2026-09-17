@@ -773,6 +773,31 @@ def _identity_from_msal_cache(token_cache):
     return ""
 
 
+# Diagnostico de flota: los platform scripts de Intune no devuelven salida (solo
+# exito/fallo), asi que intune-diag-user.ps1 manda aqui su linea de estado. Se
+# guarda una linea por informe; la ultima de cada equipo es la que vale.
+DIAG_FILE = os.environ.get("HEURA_DIAG_FILE", "/var/lib/heura-mcp/diag/equipos.tsv")
+
+
+def _append_diag(body: dict) -> dict:
+    """Anota un informe de diagnostico (equipo, usuario, estado, detalle) en DIAG_FILE."""
+    import datetime
+    def limpio(v, n=400):
+        return " ".join(str(v or "").split())[:n].replace("\t", " ")
+    equipo, usuario = limpio(body.get("computer"), 60), limpio(body.get("user"), 60)
+    if not equipo:
+        raise ValueError("Falta 'computer'")
+    estado = "OK" if body.get("ok") else "KO"
+    linea = "\t".join([
+        datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        equipo, usuario, estado, limpio(body.get("detail")),
+    ])
+    os.makedirs(os.path.dirname(DIAG_FILE), exist_ok=True)
+    with open(DIAG_FILE, "a", encoding="utf-8") as f:
+        f.write(linea + "\n")
+    return {"status": "anotado", "computer": equipo, "estado": estado}
+
+
 class _RegisterHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass  # silenciar logs de acceso
@@ -785,7 +810,7 @@ class _RegisterHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_POST(self):
-        if self.path != "/register":
+        if self.path not in ("/register", "/diag"):
             self._respond(404, {"error": "Not found"})
             return
 
@@ -800,6 +825,14 @@ class _RegisterHandler(BaseHTTPRequestHandler):
 
         length = int(self.headers.get("Content-Length", 0))
         body   = json.loads(self.rfile.read(length))
+
+        if self.path == "/diag":
+            try:
+                self._respond(200, _append_diag(body))
+            except (ValueError, OSError) as exc:
+                self._respond(400, {"error": str(exc)})
+            return
+
         token_cache = body.get("token_cache", "")
         declarado   = body.get("user_email", "").strip().lower()
 
