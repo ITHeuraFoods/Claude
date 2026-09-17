@@ -1250,7 +1250,9 @@ def _slim_chat(c: dict) -> dict:
 @mcp.tool()
 def list_chats(user_email: str, top: int = 20) -> list:
     """Chats de Teams del usuario (1:1, grupo y reunión), del más reciente al más antiguo, con sus miembros."""
-    r = _call("GET", f"/me/chats?$expand=members&$top={top}&$orderby=lastUpdatedDateTime desc", user_email)
+    # /me/chats no admite $orderby por lastUpdatedDateTime (400); Graph ya los devuelve del mas
+    # reciente al mas antiguo.
+    r = _call("GET", f"/me/chats?$expand=members&$top={top}", user_email)
     return [_slim_chat(c) for c in r.get("value", [])]
 
 

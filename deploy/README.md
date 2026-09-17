@@ -64,10 +64,11 @@ Microsoft Graph → Delegated). Hay que añadirlos y pulsar **Grant admin consen
 | `Team.ReadBasic.All`, `Channel.ReadBasic.All` | listar equipos y canales |
 | `ChannelMessage.Read.All` | leer mensajes de canal (solo admin consent) |
 
-El script de login los pide junto a los básicos; si aún no están concedidos, repite el login solo
-con los básicos y avisa, así nadie se queda sin correo ni calendario. Cuando estén concedidos, cada
-persona relanza «Conectar M365 con Claude» **una vez**; desde la 1.6.0 eso ya no invalida el token
-anterior, así que no hace falta reiniciar Claude.
+Concedidos con **admin consent** el 2026-09-17. Verificado: al ser consentimiento de administrador,
+las sesiones M365 ya registradas obtienen los permisos nuevos con su refresh token actual, **sin
+volver a hacer login**. El script de login los pide igualmente junto a los básicos (y si Entra los
+rechazara, repite solo con los básicos y avisa). Si a alguien una tool nueva le devuelve "necesita
+permisos", que relance «Conectar M365 con Claude»: desde la 1.6.0 no invalida el token anterior.
 
 ## Diagnóstico de toda la flota (Intune Platform script)
 
