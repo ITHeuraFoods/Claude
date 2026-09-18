@@ -96,10 +96,15 @@ veces): para repetir el diagnóstico hay que volver a subir el script con algún
 
 `intune-detect-mcp.ps1` es la misma detección en formato Remediations, por si algún día hay licencia.
 
+> **Al subir cualquiera de estos scripts a Intune, «Enforce script signature check» = No.** Con Yes, el
+> agente valida la firma y un script sin firmar no llega ni a ejecutarse: en el log del equipo sale
+> «...is not digitally signed. You cannot run this script on the current system» (visto el 2026-09-18).
+
 Códigos KO: `sin-managed-settings`, `policy-sin-heura-erp`, `marketplace-no-clonado`,
 `plugin-no-instalado`, `plugin-cache-vieja(instalada<marketplace)`, `claude-nunca-abierto`,
 `sin-login-m365` (no ha ejecutado el acceso directo), `faltan-mcp(...)`, `sin-acceso-directo`,
-`sin-python`, `python-roto`, `python-sin-msal`. `hub-alcanzable` es informativo: sin VPN da 0/3.
+`sin-python`, `python-roto`, `python-sin-msal`, `tokens-desincronizados` (un MCP con un token distinto
+al de los demás: da 401 solo ese; se arregla relanzando «Conectar M365 con Claude»). `hub-alcanzable` es informativo: sin VPN da 0/3.
 
 ## Verificación
 

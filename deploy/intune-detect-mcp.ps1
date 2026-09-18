@@ -44,12 +44,20 @@ $info += "plugin=$(if ($vInst) { $vInst } else { '-' })"
 $uc = "$env:USERPROFILE\.claude.json"
 if (Test-Path $uc) {
     $c = Get-Content $uc -Raw | ConvertFrom-Json
-    $con = @(); $sin = @()
+    $con = @(); $sin = @(); $tok = @{}
     foreach ($n in 'sap-heura-remote', 'graph-heura-remote', 'odoo-heura-remote') {
-        if ($c.mcpServers.$n.headers.Authorization) { $con += $n } else { $sin += $n }
+        $a = $c.mcpServers.$n.headers.Authorization
+        if ($a) { $con += $n; $tok[$n] = $a } else { $sin += $n }
     }
     if ($con.Count -eq 0) { $ko += "sin-login-m365" }
     elseif ($sin.Count -gt 0) { $ko += "faltan-mcp(" + ($sin -join ',') + ")" }
+    # Todos los servidores comparten el MISMO token (identifica a la persona, no al servicio).
+    # Si uno difiere es que se quedo atras en un login viejo y ese MCP dara 401 mientras los
+    # demas funcionan: paso con odoo, anadido al hub despues que sap y graph (2026-09-14).
+    $distintos = @($tok.Values | Sort-Object -Unique)
+    if ($con.Count -gt 1 -and $distintos.Count -gt 1) {
+        $ko += "tokens-desincronizados(" + ($con -join ',') + ")"
+    }
     $info += "mcp-con-token=$($con.Count)/3"
 } else {
     $ko += "claude-nunca-abierto"
