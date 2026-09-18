@@ -56,6 +56,15 @@ if (Test-Path $uc) {
     if ($con.Count -eq 0) { $ko += "sin-login-m365" }
     elseif ($sin.Count -gt 0) { $ko += "faltan-mcp(" + ($sin -join ',') + ")" }
     $info += "mcp-con-token=$($con.Count)/3"
+    # Un token distinto en un servidor = entrada huerfana: la creo el script de usuario
+    # copiando el token de entonces y un login posterior no la reescribio (paso con Odoo,
+    # que entro en el script de login el 2026-09-14). Sintoma: ese MCP da 401 y los otros no.
+    if ($con.Count -gt 1) {
+        $distintos = @($con | ForEach-Object { $c.mcpServers.$_.headers.Authorization } | Select-Object -Unique)
+        if ($distintos.Count -gt 1) {
+            $ko += "tokens-desincronizados"
+        }
+    }
 } else {
     $ko += "claude-nunca-abierto"
     $info += "mcp-con-token=0/3"
