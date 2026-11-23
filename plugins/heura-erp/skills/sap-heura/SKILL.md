@@ -90,7 +90,31 @@ embebidos (que no dependa de SAP al abrirlo), KPIs + gráficos + tabla de detall
 ## Notas de acceso
 
 - Las APIs transaccionales standard (`API_*`) y las vistas `ZVCDS*_CDS` están accesibles.
-- Algunos APIs FI/CO sueltos (Billing, GL Line Items, Cost Center API propia) no existen
+- **`API_BILLING_DOCUMENT_SRV` ya está activo** (comprobado el 2026-11-23): cabeceras y
+  posiciones de factura de venta. Sigue sin haber API para el **PDF** de la factura
+  (`GetPDF` da `V_O2C/103`, la factura ZFRA va por salida NAST y no se archiva): si piden
+  el PDF, di que no se puede sacar por aquí.
+- **Detalle de apuntes FI** (el estándar `API_OPLACCTGDOCITEMCUBE`, `API_JOURNALENTRY…` y
+  `API_COMPANYCODE` **no están publicados**; el 403 significa inexistente):
+  - Partidas de un documento: `FAC_GLV_GL_ACCOUNT_LINE_ITEMS_SRV` / `I_OperationalAcctgDocItem`.
+  - **Quién lo creó y con qué transacción**: `FAC_FINANCIAL_DOCUMENT_SRV_01` / `Headers`
+    (`CreatedByUser`, `TransactionCode`, `ReferenceDocumentType`; clave
+    `AccountingDocument`+`CompanyCode`+`FiscalYear`).
+  - Textos de cuenta de mayor: `I_GLAccountInCompanyCodeStdVH`
+    (`API_GLACCOUNTINCHARTOFACCOUNTS` tampoco está publicado).
+- **`A_JournalEntryItemBasic` no admite filtrar por `AccountingDocument`, `ReferenceDocument`
+  ni `Supplier`**: da 400. Para localizar una factura de proveedor o un documento concreto
+  ve por `API_SUPPLIERINVOICE_PROCESS_SRV` o por `FAC_FINANCIAL_DOCUMENT_SRV_01`.
+- **POD de entregas** (cantidad entregada, motivo de diferencia, fecha): solo en
+  `ZVCDSSD_VENTAS_CDS` / `ZVCDSSD_VENTAS` (`POD_Quantity`, `Reason`, `Reason_Text`,
+  `POD_Status`, `POD_Date`). El estándar solo da estado y fecha.
+- **El nombre de servicio del catálogo del gateway lleva la `Z` prefijada** en
+  `TechnicalServiceName` para los servicios propios; si un servicio sale 403, prueba el
+  nombre completo (`MetadataUrl`) antes de concluir que no existe.
+- **`$count` rompe `query_sap`**: cuenta paginando con `top` y `filter`, no con `$count`.
+- **Salidas grandes** (cientos de filas): guárdalas en un fichero del scratchpad y
+  procésalas con Python en vez de volcarlas al chat.
+- Algunos APIs FI/CO sueltos (GL Line Items estándar, Cost Center API propia) no existen
   aquí y devuelven 403: usa `API_JOURNALENTRYITEMBASIC_SRV` (Universal Journal) para
   FI+CO, y `ZVCDS_VBRP_CDS` para facturas de venta.
 - El hub solo es alcanzable desde la red de Heura o con la SSL-VPN conectada.

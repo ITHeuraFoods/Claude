@@ -18,6 +18,21 @@ con la identidad real del usuario (OAuth 2.0 delegado). Las horas se expresan si
 - Si el usuario duda entre enviar y revisar, usa `create_draft_email`: él lo revisa en Outlook.
 - Si el usuario no ha especificado su email M365, pregúntalo antes de continuar.
 
+## Buzones compartidos (parámetro `mailbox`)
+
+Las 13 tools de correo (`list_emails`, `get_email`, `list_folders`, `list_categories`,
+`list_attachments`, `get_attachment`, `send_email`, `reply_email`, `forward_email`,
+`create_draft_email`, `send_draft_email`, `move_email`, `mark_email`) aceptan `mailbox`:
+
+- **Vacío** (lo normal): el buzón de `user_email`.
+- **`mailbox="pedidos@heurafoods.com"`**: ese buzón compartido o delegado. El acceso lo decide
+  Exchange: si la persona no tiene la delegación (Full Access / Send As), Graph devuelve 403
+  y no hay nada que arreglar desde aquí.
+- **Pasa el mismo `mailbox` a toda la cadena** (`list_emails` → `get_email` → `reply_email` →
+  `move_email`...) o dará 404: el `id` de un mensaje solo vale en su buzón.
+- Solo cambia el buzón. Los adjuntos (`onedrive_path`, `share_url`) siguen saliendo del
+  OneDrive de **quien escribe**, no del buzón compartido.
+
 ## Paso 0 — Identificar al usuario y verificar sesión M365
 
 Antes de cualquier acción necesitas el email M365 del usuario (ej: `ana@heurafoods.com`).
@@ -34,6 +49,10 @@ Una vez tengas el email, **llama siempre primero** a `list_calendar_events(user_
   ejecuta el login y reintenta esa tool. No hace falta reiniciar Claude: desde la 1.6.0 volver a
   loguearse no invalida el token anterior. Si tras el login sigue fallando, IT tiene que conceder
   esos permisos en Entra: díselo al usuario.
+
+Si no hay sesión, la vía normal del usuario es el acceso directo del escritorio **«Conectar M365 con Claude»**
+(hace lo mismo que el comando de abajo y además registra el token en los tres MCP). Recuerda que **el hub solo
+se alcanza desde la red de Heura o con la VPN conectada**: sin VPN, los errores de conexión no son de sesión.
 
 ### Login automático
 

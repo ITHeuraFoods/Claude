@@ -75,6 +75,14 @@ query_odoo("purchase.order.line",
 
 ## Normas de negocio (convenciones Heura — aplícalas SIEMPRE)
 
+- **Todos los usuarios ven lo mismo**: el MCP usa una sola cuenta compartida, así que no
+  hay permisos por persona. No des por hecho que lo que ves es lo que vería quien pregunta
+  en la app de Odoo.
+- **Tablas enormes (`ir.attachment`, apuntes, movimientos): pon siempre un `domain`.**
+  Un `count_odoo("ir.attachment")` sin filtro agota los 60 s del hub y da timeout.
+- **BOM (`mrp.bom`, 461 registros)**: Odoo está congelado desde 2024 y **no es la fuente
+  vigente** de las listas de materiales. Dilo cuando respondas con un BOM de Odoo.
+
 - `account.move.move_type`: `out_invoice`=factura cliente, `in_invoice`=factura
   proveedor, `out_refund`/`in_refund`=abonos, `entry`=asiento.
   `payment_state` y `amount_residual` para pendiente de cobro/pago.

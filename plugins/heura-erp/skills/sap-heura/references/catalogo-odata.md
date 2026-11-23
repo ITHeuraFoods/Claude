@@ -2,7 +2,9 @@
 
 Áreas de negocio con su servicio y entidad OData, para construir llamadas a
 `query_sap` sin adivinar. Generado desde el `CATALOG` de `scripts/sap_connector.py`;
-si cambia allí, regenerar aquí.
+si cambia allí, regenerar aquí. **Ojo:** el estado real del gateway va por delante del
+`CATALOG` del script (p. ej. `API_BILLING_DOCUMENT_SRV` ya está activo y `FI_DOC_*` de abajo
+no están en el script); si regeneras este fichero, conserva las notas marcadas «2026-11-23».
 
 **Antes de inventarte un nombre de servicio, busca en esta tabla.** Un servicio que
 no existe devuelve **403** en este gateway, no 404, y parece falta de permisos.
@@ -38,7 +40,7 @@ Posiciones de factura de venta (VBRP). Alternativa al API de Billing (que está 
 - **Servicio**: `ZVCDS_VBRP_CDS`
 - **Entidad**: `ZVCDS_VBRP`
 
-> El API_BILLING_DOCUMENT_SRV standard da 403; usar esta vista CDS. Ejecutar primero query con $top=1 para descubrir los campos disponibles.
+> 2026-11-23: `API_BILLING_DOCUMENT_SRV` / `A_BillingDocument` **ya responde** (antes daba 403). Esta vista CDS sigue valiendo para posiciones. Ejecutar primero query con $top=1 para descubrir los campos disponibles. Sin PDF de factura por API.
 
 ## VENTAS_RESUMEN
 
@@ -47,7 +49,7 @@ Vista analítica de ventas (formato Odoo-friendly).
 - **Servicio**: `ZVCDSSD_VENTAS_CDS`
 - **Entidad**: `ZVCDSSD_VENTAS`
 
-> Ejecutar con $top=1 para ver campos.
+> Ejecutar con $top=1 para ver campos. 2026-11-23: incluye el **POD** (`Delivery_asociada`, `POD_Quantity`, `POD_Status`, `POD_Date`, `Reason`, `Reason_Text`, `Lote`).
 
 ## VENTAS_DEVOLUCIONES
 
@@ -139,6 +141,29 @@ Universal Journal (ACDOCA): TODAS las partidas contables FI+CO.
 - **Campos útiles**: `CompanyCode, LedgerFiscalYear, Ledger, GLAccount, GLAccountName, CostCenter, ProfitCenter, FunctionalArea, AmountInCompanyCodeCurrency, CompanyCodeCurrency, AmountInTransactionCurrency, TransactionCurrency, Segment`
 
 > FILTRO OBLIGATORIO: CompanyCode + LedgerFiscalYear + Ledger eq '0L'. Ej: CompanyCode eq '1000' and LedgerFiscalYear eq '2026' and Ledger eq '0L'. Esta tabla incluye contabilidad financiera (FI) y analítica (CO) unificadas.
+
+> 2026-11-23: **no admite filtrar por `AccountingDocument`** (400). Para un documento concreto usa `FI_DOC_CABECERA` / `FI_DOC_PARTIDAS`.
+
+## FI_DOC_CABECERA (2026-11-23)
+
+Cabecera de documento FI: **creador, transacción, tipo de documento, referencia**.
+
+- **Servicio**: `FAC_FINANCIAL_DOCUMENT_SRV_01`
+- **Entidad**: `Headers`
+- **Campos clave**: `AccountingDocument, CompanyCode, FiscalYear`
+- **Campos útiles**: `CreatedByUser, CreationDate, TransactionCode, AccountingDocumentType, PostingDate, DocumentReferenceID, ReferenceDocumentType, OriginalReferenceDocument`
+
+> Devuelve decenas de campos de UI: usa `select`. Navegación a `Items`, `Taxes`, `Notes`.
+
+## FI_DOC_PARTIDAS (2026-11-23)
+
+Partidas de documentos FI (clientes, proveedores, mayor) con vencimiento, cuenta y pedido/factura de origen.
+
+- **Servicio**: `FAC_GLV_GL_ACCOUNT_LINE_ITEMS_SRV`
+- **Entidad**: `I_OperationalAcctgDocItem`
+- **Campos útiles**: `CompanyCode, AccountingDocument, FiscalYear, AccountingDocumentItem, GLAccount, Customer, Supplier, AmountInCompanyCodeCurrency, DebitCreditCode, PostingDate, NetDueDate, ClearingDate, BillingDocument, PurchasingDocument, DocumentItemText`
+
+> Textos de cuenta: servicio `I_GLAccountInCompanyCodeStdVH`.
 
 ## FI_SOCIEDADES
 
