@@ -99,7 +99,7 @@ if (Test-Path $uc) {
             $tieneToken = $true
             # El de Odoo llego despues (2026-09-14) y no lo tiene quien se
             # registro antes; lo anade el script de usuario de Intune.
-            $faltan = @('sap-heura-remote','odoo-heura-remote') |
+            $faltan = @('sap-heura-remote','odoo-heura-remote','salesprices-heura-remote') |
                       Where-Object { -not $c.mcpServers.$_.headers.Authorization }
             if ($faltan) {
                 Reporta $wr "faltan servidores en ~/.claude.json: $($faltan -join ', ')"
@@ -135,7 +135,7 @@ try {
     Reporta $ko "mcp.heurafoods.com NO resuelve"
     $problemas += "Problema de DNS"
 }
-$puertos = @{ 3001 = "SAP"; 3002 = "M365"; 3004 = "Odoo" }
+$puertos = @{ 3001 = "SAP"; 3002 = "M365"; 3004 = "Odoo"; 3005 = "Sales Prices" }
 $caidos = @()
 foreach ($p in ($puertos.Keys | Sort-Object)) {
     if (Test-NetConnection mcp.heurafoods.com -Port $p -InformationLevel Quiet -WarningAction SilentlyContinue) {

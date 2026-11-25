@@ -120,6 +120,7 @@ su token a la entrada nueva.
 Test-NetConnection mcp.heurafoods.com -Port 3001   # SAP
 Test-NetConnection mcp.heurafoods.com -Port 3002   # M365
 Test-NetConnection mcp.heurafoods.com -Port 3004   # Odoo
+Test-NetConnection mcp.heurafoods.com -Port 3005   # Sales Prices
 ```
 
 **El hub solo se alcanza desde la red de Heura o con la SSL-VPN conectada.** Si fallan los
