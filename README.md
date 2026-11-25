@@ -32,6 +32,7 @@ de Heura, no ejecutando scripts en el equipo de cada persona.
 | `sap-heura-remote` | SAP S/4HANA (PS4) | Cuenta de servicio |
 | `graph-heura-remote` | M365: correo, calendario, Teams, OneDrive, To Do | **La de cada persona** |
 | `odoo-heura-remote` | Odoo | Cuenta compartida única. Solo lectura |
+| `salesprices-heura-remote` | Sales Prices (salesprices.heurafoods.com) | Tarifas, precio esperado, auditoría de precios, facturado y abonos por precio. Solo lectura; clave de la API solo en el hub |
 
 Cada llamada exige un token bearer que identifica a quien pregunta, y queda registrada. El
 token lo emite el hub tras un login real contra Entra: es lo que hace el acceso directo

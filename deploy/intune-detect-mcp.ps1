@@ -11,7 +11,7 @@
 # Resultado por equipo en el informe de la remediation, columna "Pre-remediation detection
 # output" (exportable a CSV). Formato:
 #   EQUIPO usuario | plugin=1.5.1 mcp-con-token=3/3 hub-alcanzable=3/3 | OK
-#   EQUIPO usuario | plugin=1.4.0 mcp-con-token=0/3 hub-alcanzable=0/3 | KO: sin-login-m365 plugin-cache-vieja(1.4.0<1.5.1)
+#   EQUIPO usuario | plugin=1.4.0 mcp-con-token=0/4 hub-alcanzable=0/3 | KO: sin-login-m365 plugin-cache-vieja(1.4.0<1.5.1)
 
 $ErrorActionPreference = 'SilentlyContinue'
 $ko = @(); $info = @()
@@ -45,7 +45,7 @@ $uc = "$env:USERPROFILE\.claude.json"
 if (Test-Path $uc) {
     $c = Get-Content $uc -Raw | ConvertFrom-Json
     $con = @(); $sin = @(); $tok = @{}
-    foreach ($n in 'sap-heura-remote', 'graph-heura-remote', 'odoo-heura-remote') {
+    foreach ($n in 'sap-heura-remote', 'graph-heura-remote', 'odoo-heura-remote', 'salesprices-heura-remote') {
         $a = $c.mcpServers.$n.headers.Authorization
         if ($a) { $con += $n; $tok[$n] = $a } else { $sin += $n }
     }
@@ -58,10 +58,10 @@ if (Test-Path $uc) {
     if ($con.Count -gt 1 -and $distintos.Count -gt 1) {
         $ko += "tokens-desincronizados(" + ($con -join ',') + ")"
     }
-    $info += "mcp-con-token=$($con.Count)/3"
+    $info += "mcp-con-token=$($con.Count)/4"
 } else {
     $ko += "claude-nunca-abierto"
-    $info += "mcp-con-token=0/3"
+    $info += "mcp-con-token=0/4"
 }
 
 # 4. Acceso directo de login (lo crea intune-deploy-user.ps1)
@@ -77,12 +77,12 @@ else {
     if ($mods -ne "ok") { $ko += "python-sin-msal" }
 }
 
-# 6. Red: solo informativo, sin VPN es normal que de 0/3
+# 6. Red: solo informativo, sin VPN es normal que de 0/4
 $red = 0
-foreach ($p in 3001, 3002, 3004) {
+foreach ($p in 3001, 3002, 3004, 3005) {
     if (Test-NetConnection mcp.heurafoods.com -Port $p -InformationLevel Quiet -WarningAction SilentlyContinue) { $red++ }
 }
-$info += "hub-alcanzable=$red/3"
+$info += "hub-alcanzable=$red/4"
 
 $estado = if ($ko.Count) { "KO: " + ($ko -join ' ') } else { "OK" }
 Write-Output ("{0} {1} | {2} | {3}" -f $env:COMPUTERNAME, $env:USERNAME, ($info -join ' '), $estado)

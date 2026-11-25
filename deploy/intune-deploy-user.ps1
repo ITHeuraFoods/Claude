@@ -76,7 +76,7 @@ try {
     # Quien aun no se haya registrado no se ve afectado: el script de login ya
     # crea los tres.
     $uc = "$env:USERPROFILE\.claude.json"
-    $nuevos = @{ "odoo-heura-remote" = "http://mcp.heurafoods.com:3004/mcp" }
+    $nuevos = @{ "odoo-heura-remote" = "http://mcp.heurafoods.com:3004/mcp"; "salesprices-heura-remote" = "http://mcp.heurafoods.com:3005/mcp" }
     if (Test-Path $uc) {
         try {
             $cfg = Get-Content $uc -Raw -Encoding UTF8 | ConvertFrom-Json
